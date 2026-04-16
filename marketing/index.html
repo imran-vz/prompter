@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Prompter — The Teleprompter for macOS</title>
+        <meta
+            name="description"
+            content="A free, open-source teleprompter for macOS with speech-to-text auto-scrolling. Apple Speech &amp; WhisperKit. On-device. Private."
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <div
+            class="min-h-screen bg-[#fafafa] text-[#0a0a0a] font-['Space_Mono'] pb-16"
+        >
+            <!-- ─── HERO ─── -->
+            <section class="relative border-b-4 border-[#0a0a0a]">
+                <div
+                    class="absolute inset-0 pointer-events-none hidden md:block"
+                >
+                    <div
+                        class="absolute left-[10%] top-0 bottom-0 w-px bg-[#0a0a0a]/10"
+                    ></div>
+                    <div
+                        class="absolute left-[30%] top-0 bottom-0 w-px bg-[#0a0a0a]/10"
+                    ></div>
+                    <div
+                        class="absolute left-[50%] top-0 bottom-0 w-px bg-[#0a0a0a]/10"
+                    ></div>
+                    <div
+                        class="absolute left-[70%] top-0 bottom-0 w-px bg-[#0a0a0a]/10"
+                    ></div>
+                    <div
+                        class="absolute left-[90%] top-0 bottom-0 w-px bg-[#0a0a0a]/10"
+                    ></div>
+                </div>
+
+                <div
+                    class="max-w-400 mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-16 sm:pb-20 relative"
+                >
+                    <div class="flex flex-wrap items-center gap-2 hero-enter">
+                        <span
+                            class="text-[10px] sm:text-xs tracking-widest uppercase border-2 border-[#0a0a0a] px-3 py-1"
+                            >macOS 14.0+</span
+                        >
+                        <span
+                            class="text-[10px] sm:text-xs tracking-widest uppercase border-2 border-[#0a0a0a] px-3 py-1 bg-[#0a0a0a] text-[#fafafa]"
+                            >OPEN SOURCE</span
+                        >
+                    </div>
+
+                    <h1
+                        class="font-['Archivo_Black'] text-[clamp(48px,15vw,280px)] leading-[0.85] tracking-tighter mt-6 sm:mt-8 hero-enter hero-enter-delay-1"
+                    >
+                        PROMP<span class="text-[#ff2d20]">TER</span>
+                    </h1>
+
+                    <div
+                        class="flex flex-col md:flex-row md:items-end md:justify-between mt-6 gap-6 sm:gap-8"
+                    >
+                        <p
+                            class="text-xs sm:text-sm md:text-base max-w-md leading-relaxed hero-enter hero-enter-delay-2"
+                        >
+                            A free, open-source teleprompter for macOS.
+                            Speech-to-text auto-scrolling with Apple&nbsp;Speech
+                            and WhisperKit. On-device voice recognition. Your
+                            scripts never leave your Mac.
+                        </p>
+                        <div
+                            class="text-[9px] sm:text-[10px] leading-2.5 text-[#0a0a0a]/50 hidden lg:block hero-enter hero-enter-delay-3"
+                        >
+                            <pre>
+╔═══════════════════════════════════════╗
+║  >> SPEECH DETECTED                   ║
+║  >> ENGINE: APPLE SPEECH              ║
+║  >> ALIGNMENT: 99.7%                  ║
+║  >> SCROLL: AUTO                      ║
+╚═══════════════════════════════════════╝</pre
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── MANIFESTO STRIP ─── -->
+            <section
+                class="border-b-4 border-[#0a0a0a] bg-[#0a0a0a] text-[#fafafa]"
+            >
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-8 sm:py-10">
+                    <div
+                        class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-10 md:gap-16"
+                    >
+                        <span
+                            class="font-['Archivo_Black'] text-4xl sm:text-6xl md:text-8xl text-[#ff2d20]"
+                            >01</span
+                        >
+                        <p
+                            class="text-base sm:text-lg md:text-2xl leading-snug max-w-4xl"
+                        >
+                            We built the teleprompter we wanted. Free. Open
+                            source. MIT-licensed. No accounts, no subscriptions,
+                            no tracking. Just a native Mac app that listens to
+                            your voice and scrolls your&nbsp;script.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── APP MOCK ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <div class="flex flex-col lg:flex-row gap-10 lg:gap-20">
+                        <div class="flex-1">
+                            <h2
+                                class="font-['Archivo_Black'] text-[clamp(32px,8vw,120px)] leading-none mb-6 sm:mb-8"
+                                data-reveal="up"
+                            >
+                                THE<br />INTERFACE
+                            </h2>
+                            <p
+                                class="text-xs sm:text-sm md:text-base max-w-sm mb-6 leading-relaxed"
+                            >
+                                A notch-connected window that flows seamlessly
+                                from the macOS menu bar. Three themes tuned for
+                                any lighting. Built with Swift and&nbsp;AppKit.
+                            </p>
+                            <div
+                                class="text-[10px] sm:text-xs border-2 border-[#0a0a0a] p-3 sm:p-4 inline-block"
+                            >
+                                <span class="text-[#ff2d20]">*</span>
+                                NOTCH-CONNECTED WINDOW SHAPE<br />
+                                <span class="text-[#ff2d20]">*</span> APPLE
+                                SPEECH + WHISPERKIT ENGINES<br />
+                                <span class="text-[#ff2d20]">*</span> VOICE
+                                ACTIVITY DETECTION<br />
+                                <span class="text-[#ff2d20]">*</span>
+                                MULTI-DISPLAY SUPPORT
+                            </div>
+                        </div>
+
+                        <div class="flex-1" data-reveal="scale">
+                            <div class="relative">
+                                <div
+                                    class="mx-auto w-30 sm:w-40 h-7 sm:h-8 bg-[#0a0d1a] rounded-b-xl flex items-center justify-center gap-1.5 relative z-10"
+                                >
+                                    <div
+                                        class="w-1.5 h-1.5 rounded-full bg-[#00d4ff]/60"
+                                    ></div>
+                                    <span
+                                        class="text-[8px] sm:text-[9px] text-[#00d4ff]/80 font-['Space_Mono'] tracking-wider"
+                                        >PROMPTER</span
+                                    >
+                                </div>
+                                <div
+                                    class="bg-[#0a0d1a] text-[#dce4ff] font-mono text-[10px] sm:text-xs md:text-sm p-4 sm:p-6 md:p-8 border-4 border-[#0a0a0a] shadow-[12px_12px_0px_0px_#ff2d20] sm:shadow-[16px_16px_0px_0px_#ff2d20] -mt-1 relative"
+                                >
+                                    <div
+                                        class="absolute top-0 left-0 right-0 h-8 bg-linear-to-b from-[#0a0d1a] to-transparent z-10 pointer-events-none"
+                                    ></div>
+                                    <div class="space-y-3 sm:space-y-4 pt-4">
+                                        <p
+                                            class="text-[#dce4ff]/30 text-[10px] sm:text-xs"
+                                        >
+                                            ...and that brings us to the core of
+                                            the presentation.
+                                        </p>
+                                        <p
+                                            class="text-[#dce4ff]/50 text-[10px] sm:text-xs"
+                                        >
+                                            The future of public speaking is not
+                                            about memorization.
+                                        </p>
+                                        <p
+                                            class="text-[#dce4ff] text-sm sm:text-lg md:text-xl font-medium"
+                                            style="
+                                                text-shadow: 0 0 20px
+                                                    rgba(0, 212, 255, 0.3);
+                                            "
+                                        >
+                                            It's about
+                                            <span class="text-[#00d4ff]"
+                                                >clarity</span
+                                            >
+                                            and
+                                            <span class="text-[#00d4ff]"
+                                                >confidence</span
+                                            >.
+                                        </p>
+                                        <p
+                                            class="text-[#dce4ff]/50 text-[10px] sm:text-xs"
+                                        >
+                                            When you free your mind from
+                                            remembering lines,
+                                        </p>
+                                        <p
+                                            class="text-[#dce4ff]/30 text-[10px] sm:text-xs"
+                                        >
+                                            you can focus entirely on connecting
+                                            with your audience.
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-[#0a0d1a] to-transparent pointer-events-none"
+                                    ></div>
+                                    <div
+                                        class="absolute top-4 right-3 bottom-4 w-0.75 bg-[#00d4ff]/10 rounded-full"
+                                    >
+                                        <div
+                                            class="w-full h-[45%] bg-[#00d4ff]/40 rounded-full"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── FEATURES STACK ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto">
+                    <div
+                        class="px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a]"
+                    >
+                        <h2
+                            class="font-['Archivo_Black'] text-[clamp(40px,10vw,140px)]"
+                        >
+                            FEATURES
+                        </h2>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="left"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >001</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    SPEECH-TO-TEXT AUTO-SCROLL
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    Choose between Apple Speech or WhisperKit
+                                    for on-device voice recognition. Prompter
+                                    listens and scrolls in real time. No foot
+                                    pedals. No remote controls. Just speak.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="right"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >002</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    REAL-TIME VOICE ALIGNMENT
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    Intelligent transcript alignment matches
+                                    your spoken words to the script. If you
+                                    pause, the teleprompter pauses. If you skip
+                                    ahead or go off-script, it catches up with
+                                    configurable smoothing.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="left"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >003</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    VOICE ACTIVITY DETECTION
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    Built-in VAD distinguishes speech from
+                                    silence. The prompter holds position during
+                                    natural pauses — no unwanted drift during
+                                    turn gaps or breathing room.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="right"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >004</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    NOTCH-CONNECTED WINDOW
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    A custom window shape with inverted corners
+                                    that flows seamlessly from the macOS
+                                    notch/menu bar. Maximizes usable screen real
+                                    estate with a design that looks native.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="left"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >005</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    THREE OBSESSIVE THEMES
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    Midnight: deep navy with cyan accents. Dark:
+                                    pure black with white text. Light: warm
+                                    off-white with blue highlights. Each tuned
+                                    for readability under studio lights,
+                                    sunlight, or late-night sessions.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="group px-4 sm:px-6 py-10 sm:py-14 border-b-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                        data-reveal="right"
+                    >
+                        <div
+                            class="flex flex-col md:flex-row md:items-start gap-4 sm:gap-6 md:gap-16"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-7xl text-[#ff2d20]"
+                                >006</span
+                            >
+                            <div class="flex-1">
+                                <h3
+                                    class="font-['Archivo_Black'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight mb-3 sm:mb-4"
+                                >
+                                    MULTI-DISPLAY &amp; FOLLOW CURSOR
+                                </h3>
+                                <p
+                                    class="text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed opacity-90"
+                                >
+                                    Pin the prompter to any connected display or
+                                    let it follow your active screen
+                                    automatically. Left, center, or right
+                                    alignment. Adjustable width and height.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── STATS / COUNTERS ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-3 gap-0 border-4 border-[#0a0a0a]"
+                    >
+                        <div
+                            class="p-6 sm:p-8 md:p-12 flex flex-col justify-between min-h-45 sm:min-h-60 hover:translate-x-1 hover:-translate-y-1 transition-transform border-b-4 sm:border-b-0 sm:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-6xl md:text-8xl"
+                                >FREE</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest uppercase mt-4 sm:mt-6"
+                                >OPEN SOURCE · MIT</span
+                            >
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 md:p-12 flex flex-col justify-between min-h-45 sm:min-h-60 hover:translate-x-1 hover:-translate-y-1 transition-transform border-b-4 sm:border-b-0 sm:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-6xl md:text-8xl"
+                                >&lt; 50MB</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest uppercase mt-4 sm:mt-6"
+                                >DOWNLOAD SIZE</span
+                            >
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 md:p-12 flex flex-col justify-between min-h-45 sm:min-h-60 hover:translate-x-1 hover:-translate-y-1 transition-transform border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-6xl md:text-8xl"
+                                >100%</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest uppercase mt-4 sm:mt-6"
+                                >ON-DEVICE · PRIVATE</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── THEMES SECTION ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-16 sm:py-24">
+                    <div class="flex flex-col gap-12 sm:gap-20">
+                        <div
+                            class="flex flex-col md:flex-row md:items-end gap-6 sm:gap-8"
+                        >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest uppercase border-2 border-[#0a0a0a] px-3 py-1 h-fit w-fit"
+                                >THEMES</span
+                            >
+                            <h2
+                                class="font-['Archivo_Black'] text-[clamp(36px,10vw,140px)] leading-[0.9]"
+                                data-reveal="up"
+                            >
+                                MIDNIGHT<br />
+                                <span class="text-[#ff2d20]">DARK</span><br />
+                                LIGHT
+                            </h2>
+                        </div>
+
+                        <div
+                            class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6"
+                        >
+                            <!-- Midnight -->
+                            <div
+                                class="border-4 border-[#0a0a0a] overflow-hidden"
+                                data-reveal="up"
+                            >
+                                <div
+                                    class="bg-[#0a0d1a] p-4 sm:p-6 min-h-35 sm:min-h-45 flex flex-col justify-between"
+                                >
+                                    <div class="space-y-1.5">
+                                        <div
+                                            class="h-1 w-16 sm:w-20 bg-[#dce4ff]/20 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1.5 sm:h-2 w-full bg-[#dce4ff]/80 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1 w-12 sm:w-16 bg-[#dce4ff]/20 rounded-full"
+                                        ></div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-4">
+                                        <div
+                                            class="w-2 h-2 rounded-full bg-[#00d4ff]"
+                                        ></div>
+                                        <span
+                                            class="text-[#00d4ff] text-[10px] font-['Space_Mono']"
+                                            >MIDNIGHT</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="bg-[#0a0a0a] text-[#fafafa] px-4 py-2 text-[10px] font-['Space_Mono'] tracking-wider"
+                                >
+                                    #0A0D1A · CYAN ACCENT
+                                </div>
+                            </div>
+                            <!-- Dark -->
+                            <div
+                                class="border-4 border-[#0a0a0a] overflow-hidden"
+                                data-reveal="up"
+                            >
+                                <div
+                                    class="bg-[#000000] p-4 sm:p-6 min-h-35 sm:min-h-45 flex flex-col justify-between"
+                                >
+                                    <div class="space-y-1.5">
+                                        <div
+                                            class="h-1 w-16 sm:w-20 bg-white/20 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1.5 sm:h-2 w-full bg-white/90 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1 w-12 sm:w-16 bg-white/20 rounded-full"
+                                        ></div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-4">
+                                        <div
+                                            class="w-2 h-2 rounded-full bg-white/60"
+                                        ></div>
+                                        <span
+                                            class="text-white/80 text-[10px] font-['Space_Mono']"
+                                            >DARK</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="bg-[#0a0a0a] text-[#fafafa] px-4 py-2 text-[10px] font-['Space_Mono'] tracking-wider"
+                                >
+                                    #000000 · WHITE TEXT
+                                </div>
+                            </div>
+                            <!-- Light -->
+                            <div
+                                class="border-4 border-[#0a0a0a] overflow-hidden"
+                                data-reveal="up"
+                            >
+                                <div
+                                    class="bg-[#f5f7fa] p-4 sm:p-6 min-h-35 sm:min-h-45 flex flex-col justify-between"
+                                >
+                                    <div class="space-y-1.5">
+                                        <div
+                                            class="h-1 w-16 sm:w-20 bg-[#1a1a1e]/15 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1.5 sm:h-2 w-full bg-[#1a1a1e]/80 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="h-1 w-12 sm:w-16 bg-[#1a1a1e]/15 rounded-full"
+                                        ></div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-4">
+                                        <div
+                                            class="w-2 h-2 rounded-full bg-[#387aff]"
+                                        ></div>
+                                        <span
+                                            class="text-[#387aff] text-[10px] font-['Space_Mono']"
+                                            >LIGHT</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="bg-[#0a0a0a] text-[#fafafa] px-4 py-2 text-[10px] font-['Space_Mono'] tracking-wider"
+                                >
+                                    #F5F7FA · BLUE ACCENT
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── HOW IT WORKS ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <h2
+                        class="font-['Archivo_Black'] text-[clamp(32px,8vw,120px)] mb-10 sm:mb-16"
+                    >
+                        HOW IT WORKS
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-3 gap-0 border-4 border-[#0a0a0a]"
+                    >
+                        <div
+                            class="p-6 sm:p-8 md:p-10 min-h-60 sm:min-h-80 flex flex-col hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-b-4 md:border-b-0 md:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-6xl text-[#ff2d20] mb-4 sm:mb-6"
+                                >01</span
+                            >
+                            <h3
+                                class="font-['Archivo_Black'] text-xl sm:text-2xl md:text-3xl mb-3 sm:mb-4"
+                            >
+                                PASTE
+                            </h3>
+                            <p
+                                class="text-xs sm:text-sm leading-relaxed opacity-90"
+                            >
+                                Open Settings with ⌘, and paste your script into
+                                the built-in text editor. Use [brackets] for
+                                stage directions like [pause] or [smile].
+                            </p>
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 md:p-10 min-h-60 sm:min-h-80 flex flex-col hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-b-4 md:border-b-0 md:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-6xl text-[#ff2d20] mb-4 sm:mb-6"
+                                >02</span
+                            >
+                            <h3
+                                class="font-['Archivo_Black'] text-xl sm:text-2xl md:text-3xl mb-3 sm:mb-4"
+                            >
+                                SPEAK
+                            </h3>
+                            <p
+                                class="text-xs sm:text-sm leading-relaxed opacity-90"
+                            >
+                                Enable Speech Tracking and hit Space. Prompter
+                                listens through your mic and aligns your voice
+                                to the script in real time using Apple Speech or
+                                WhisperKit.
+                            </p>
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 md:p-10 min-h-60 sm:min-h-80 flex flex-col hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-4xl sm:text-5xl md:text-6xl text-[#ff2d20] mb-4 sm:mb-6"
+                                >03</span
+                            >
+                            <h3
+                                class="font-['Archivo_Black'] text-xl sm:text-2xl md:text-3xl mb-3 sm:mb-4"
+                            >
+                                DELIVER
+                            </h3>
+                            <p
+                                class="text-xs sm:text-sm leading-relaxed opacity-90"
+                            >
+                                Focus on your audience. The text follows you —
+                                pausing when you breathe, catching up when you
+                                rush. Reset any time with ⌘R.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── KEYBOARD SHORTCUTS ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <h2
+                        class="font-['Archivo_Black'] text-[clamp(32px,8vw,120px)] mb-10 sm:mb-16"
+                    >
+                        KEYS
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-3 gap-0 border-4 border-[#0a0a0a]"
+                    >
+                        <div
+                            class="p-6 sm:p-8 flex flex-col gap-3 sm:gap-4 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-b-4 sm:border-b-0 sm:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-3xl sm:text-4xl md:text-5xl"
+                                >SPACE</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest text-[#ff2d20]"
+                                >PLAY / PAUSE</span
+                            >
+                            <span class="text-[10px] sm:text-xs opacity-60"
+                                >Toggle prompter scrolling</span
+                            >
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 flex flex-col gap-3 sm:gap-4 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-b-4 sm:border-b-0 sm:border-r-4 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-3xl sm:text-4xl md:text-5xl"
+                                >⌘ ,</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest text-[#ff2d20]"
+                                >SETTINGS</span
+                            >
+                            <span class="text-[10px] sm:text-xs opacity-60"
+                                >Open the settings panel</span
+                            >
+                        </div>
+                        <div
+                            class="p-6 sm:p-8 flex flex-col gap-3 sm:gap-4 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 border-[#0a0a0a]"
+                            data-reveal="up"
+                        >
+                            <span
+                                class="font-['Archivo_Black'] text-3xl sm:text-4xl md:text-5xl"
+                                >⌘ R</span
+                            >
+                            <span
+                                class="text-[10px] sm:text-xs tracking-widest text-[#ff2d20]"
+                                >RESET</span
+                            >
+                            <span class="text-[10px] sm:text-xs opacity-60"
+                                >Stop and return to the top</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── ZINE STRIP ─── -->
+            <section
+                class="border-b-4 border-[#0a0a0a] bg-[#ff2d20] text-[#fafafa]"
+            >
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-10 sm:py-16">
+                    <div
+                        class="flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8"
+                    >
+                        <div
+                            class="text-[9px] sm:text-[10px] leading-2.5 opacity-80 hidden lg:block"
+                        >
+                            <pre>
+╔════════════════════════════════════╗
+║  YOUR VOICE STAYS ON YOUR MAC.     ║
+║  YOUR SCRIPTS STAY ON YOUR MAC.    ║
+║  NO CLOUD. NO TELEMETRY.           ║
+╚════════════════════════════════════╝</pre
+                            >
+                        </div>
+                        <h2
+                            class="font-['Archivo_Black'] text-[clamp(28px,7vw,100px)] leading-none flex-1"
+                        >
+                            PRIVACY IS<br />NOT A FEATURE.<br />
+                            <span class="opacity-60">IT'S THE DEFAULT.</span>
+                        </h2>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── SETTINGS OVERVIEW ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <h2
+                        class="font-['Archivo_Black'] text-[clamp(32px,8vw,120px)] mb-10 sm:mb-16"
+                    >
+                        CONFIGURE<br />EVERYTHING
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 border-4 border-[#0a0a0a]"
+                    >
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-b-4 sm:border-r-4 lg:border-r-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                SCRIPT
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Built-in text editor</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >[Bracket] stage directions</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Paste any text</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-b-4 lg:border-r-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                APPEARANCE
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Font style &amp; size</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Line spacing</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Text alignment</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Top &amp; bottom fade effects</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-b-4 sm:border-r-4 lg:border-r-0 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                LAYOUT
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Window width &amp; height</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Screen position (L/C/R)</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Multi-display picker</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Follow active display</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-b-4 sm:border-b-0 lg:border-r-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                BEHAVIOR
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Scroll speed control</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Pause on hover</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Hover control strip</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Progress bar toggle</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-b-4 sm:border-b-0 sm:border-r-4 lg:border-r-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                SPEECH
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Apple Speech engine</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >WhisperKit engine</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Reading position tuning</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Smoothing adjustment</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >Mic mute toggle</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div
+                            class="p-5 sm:p-6 md:p-8 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-lg sm:text-xl md:text-2xl mb-4"
+                            >
+                                PRIVACY
+                            </h3>
+                            <ul class="space-y-1.5">
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >100% on-device STT</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >No network calls</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >No analytics</span
+                                    >
+                                </li>
+                                <li
+                                    class="text-[10px] sm:text-xs flex items-start gap-2"
+                                >
+                                    <span class="text-[#ff2d20] mt-0.5">→</span
+                                    ><span class="opacity-80"
+                                        >MIT licensed</span
+                                    >
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── FAQ ─── -->
+            <section class="border-b-4 border-[#0a0a0a]">
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-14 sm:py-20">
+                    <h2
+                        class="font-['Archivo_Black'] text-[clamp(32px,8vw,120px)] mb-8 sm:mb-12"
+                    >
+                        QUESTIONS
+                    </h2>
+                    <div class="flex flex-col gap-0 border-4 border-[#0a0a0a]">
+                        <div
+                            class="border-b-4 border-[#0a0a0a] p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                Do I need an internet connection?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                No. Both Apple Speech and WhisperKit run
+                                entirely on your Mac. Your voice data is
+                                processed locally and never leaves your device.
+                            </p>
+                        </div>
+
+                        <div
+                            class="border-b-4 border-[#0a0a0a] p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                Is this really free?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                Yes. Prompter is open-source software under the
+                                MIT license. No payments, no trials, no feature
+                                gates. Download it, use it, modify it.
+                            </p>
+                        </div>
+
+                        <div
+                            class="border-b-4 border-[#0a0a0a] p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                Does it work with external microphones?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                Yes. Any microphone recognized by macOS works
+                                seamlessly — USB, XLR via interface, AirPods,
+                                built-in mic, whatever you have.
+                            </p>
+                        </div>
+
+                        <div
+                            class="border-b-4 border-[#0a0a0a] p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                What's the difference between Apple Speech and
+                                WhisperKit?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                Apple Speech uses the built-in macOS speech
+                                framework with zero setup. WhisperKit runs
+                                OpenAI's Whisper models locally for higher
+                                accuracy — download a model in Settings to use
+                                it.
+                            </p>
+                        </div>
+
+                        <div
+                            class="border-b-4 border-[#0a0a0a] p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                Can I use it for live streaming?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                Yes. The compact, notch-connected window and
+                                adjustable sizing make it work well alongside
+                                OBS, Zoom, or any recording setup.
+                            </p>
+                        </div>
+
+                        <div
+                            class="p-4 sm:p-6 md:p-8 hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors duration-300 group"
+                            data-reveal="fade"
+                        >
+                            <h3
+                                class="font-['Archivo_Black'] text-sm sm:text-lg md:text-2xl mb-2 group-hover:translate-x-1 transition-transform"
+                            >
+                                What are the system requirements?
+                            </h3>
+                            <p
+                                class="text-[11px] sm:text-sm md:text-base opacity-80 max-w-3xl leading-relaxed"
+                            >
+                                macOS 14.0 (Sonoma) or later. Apple Silicon or
+                                Intel. Microphone access for speech tracking.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── CLOSING CTA ─── -->
+            <section>
+                <div class="max-w-400 mx-auto px-4 sm:px-6 py-16 sm:py-24">
+                    <div class="flex flex-col gap-8 sm:gap-10">
+                        <h2
+                            class="font-['Archivo_Black'] text-[clamp(48px,14vw,180px)] leading-[0.85]"
+                            data-reveal="left"
+                        >
+                            GET<br />
+                            <span class="text-[#ff2d20]">PROMPTER</span>
+                        </h2>
+
+                        <div
+                            class="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:items-center"
+                        >
+                            <a
+                                href="https://github.com/imran-vz/prompter/releases"
+                                class="inline-flex items-center justify-center px-6 sm:px-10 py-4 sm:py-5 bg-[#0a0a0a] text-[#fafafa] font-['Archivo_Black'] text-base sm:text-xl md:text-2xl border-4 border-[#0a0a0a] hover:bg-[#fafafa] hover:text-[#0a0a0a] transition-colors"
+                            >
+                                DOWNLOAD — FREE
+                            </a>
+                            <a
+                                href="https://github.com/imran-vz/prompter"
+                                class="inline-flex items-center justify-center px-6 sm:px-10 py-4 sm:py-5 bg-[#fafafa] text-[#0a0a0a] font-['Archivo_Black'] text-base sm:text-xl md:text-2xl border-4 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#fafafa] transition-colors"
+                            >
+                                ★ GITHUB
+                            </a>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 sm:gap-3 mt-2">
+                            <span
+                                class="text-[9px] sm:text-[10px] tracking-widest uppercase border-2 border-[#0a0a0a]/30 px-2 sm:px-3 py-1"
+                                >macOS 14.0+</span
+                            >
+                            <span
+                                class="text-[9px] sm:text-[10px] tracking-widest uppercase border-2 border-[#0a0a0a]/30 px-2 sm:px-3 py-1"
+                                >Apple Silicon + Intel</span
+                            >
+                            <span
+                                class="text-[9px] sm:text-[10px] tracking-widest uppercase border-2 border-[#0a0a0a]/30 px-2 sm:px-3 py-1"
+                                >MIT License</span
+                            >
+                            <span
+                                class="text-[9px] sm:text-[10px] tracking-widest uppercase border-2 border-[#0a0a0a]/30 px-2 sm:px-3 py-1"
+                                >Swift + AppKit</span
+                            >
+                        </div>
+
+                        <div
+                            class="mt-6 sm:mt-10 text-[8px] sm:text-[10px] leading-2.5 text-[#0a0a0a]/30"
+                        >
+                            <pre class="hidden sm:block">
+╔═══════════════════════════════════════════════════════════════════════╗
+║  PROMPTER — FREE &amp; OPEN SOURCE TELEPROMPTER FOR macOS             ║
+║  GITHUB.COM/IMRAN-VZ/PROMPTER  ·  MIT LICENSE  ·  MADE FOR SPEAKERS   ║
+╚═══════════════════════════════════════════════════════════════════════╝</pre
+                            >
+                            <p
+                                class="sm:hidden text-[10px] text-[#0a0a0a]/40 font-['Space_Mono'] tracking-wider"
+                            >
+                                PROMPTER · FREE &amp; OPEN SOURCE · MIT LICENSE
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

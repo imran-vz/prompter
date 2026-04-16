@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { margin: 0; }
+
+/* ─── Scroll-reveal animations ─── */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+[data-reveal="left"] { transform: translateX(-30px); }
+[data-reveal="right"] { transform: translateX(30px); }
+[data-reveal="up"] { transform: translateY(30px); }
+[data-reveal="scale"] { transform: scale(0.96); }
+[data-reveal="fade"] { transform: none; }
+
+[data-reveal].visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero entrance — plays immediately, no IO needed */
+.hero-enter {
+  animation: heroIn 0.7s ease-out both;
+}
+.hero-enter-delay-1 { animation-delay: 0.1s; }
+.hero-enter-delay-2 { animation-delay: 0.3s; }
+.hero-enter-delay-3 { animation-delay: 0.4s; }
+
+@keyframes heroIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: none; }
+}
