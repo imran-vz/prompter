@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct AlignmentResult: Equatable, Sendable {
+nonisolated struct AlignmentResult: Equatable, Sendable {
     let progress: Double
     let confidence: Double
     let matchedText: String
@@ -29,11 +29,9 @@ actor TranscriptAligner {
     private let finalWindowSize = 10
 
     private var lastMatchedIndex = 0
-    private var sequence: UInt64 = 0
 
     func reset() {
         lastMatchedIndex = 0
-        sequence = 0
     }
 
     func updateScript(_ newScript: String) {
@@ -43,7 +41,6 @@ actor TranscriptAligner {
         words = normalized.components(separatedBy: " ")
         totalWords = max(1, words.count)
         lastMatchedIndex = 0
-        sequence = 0
 
         // Build word → original-text range mapping
         var ranges: [Range<String.Index>] = []
@@ -77,15 +74,11 @@ actor TranscriptAligner {
         sentenceStartIndices = indices.isEmpty ? [0] : indices
     }
 
-    /// Returns (result, sequenceNumber). Callers should discard stale results.
-    func align(transcript: String, isFinal: Bool) -> (AlignmentResult?, UInt64) {
-        sequence += 1
-        let seq = sequence
-        let result = doAlign(transcript: transcript, isFinal: isFinal)
-        return (result, seq)
+    /// Find the current reading position for a transcript. Callers serialize
+    /// alignment through a single worker, so results are inherently in order.
+    func align(transcript: String, isFinal: Bool) -> AlignmentResult? {
+        doAlign(transcript: transcript, isFinal: isFinal)
     }
-
-    func isCurrent(_ seq: UInt64) -> Bool { seq == sequence }
 
     // MARK: - Core alignment
 

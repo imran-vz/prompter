@@ -1,7 +1,7 @@
 import Foundation
 
 /// Thread-safe mutable mute state shared across STT engines.
-final class MicState {
+nonisolated final class MicState {
     static let shared = MicState()
 
     private let lock = NSLock()

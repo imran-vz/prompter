@@ -107,10 +107,8 @@ final class PrompterViewModel: ObservableObject {
         sttController.resetAlignment()
 
         if sttEnabled {
-            Task {
-                await sttController.stop()
-                await sttController.start()
-            }
+            sttController.stop()
+            sttController.start()
         }
     }
 
@@ -126,12 +124,10 @@ final class PrompterViewModel: ObservableObject {
     // MARK: - STT
 
     func syncSTTState(enabled: Bool) {
-        Task {
-            if enabled, !sttController.isRunning {
-                await sttController.start()
-            } else if !enabled, sttController.isRunning {
-                await sttController.stop()
-            }
+        if enabled {
+            sttController.start()
+        } else {
+            sttController.stop()
         }
     }
 

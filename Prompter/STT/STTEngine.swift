@@ -1,63 +1,78 @@
 import Foundation
 
-/// VAD state emitted by STT engines and consumed by STTController.
-enum VADState: Equatable, Sendable, Hashable {
+/// VAD state owned by STTController and consumed by the ViewModel for scroll gating.
+nonisolated enum VADState: Equatable, Sendable, Hashable {
     case silence
     case speaking
     case trailingEdge
 }
 
-struct TranscriptionChunk: Equatable {
+/// A transcription result emitted by an STT engine.
+///
+/// Engines emit only text — voice-activity detection lives in the controller,
+/// fed directly from the audio pipeline, so transcription can never be gated
+/// or dropped by VAD misfires.
+nonisolated struct TranscriptionChunk: Equatable, Sendable {
     let text: String
+    /// `true` when the engine has committed this utterance and will start the
+    /// next one from scratch. The controller merges finals into the
+    /// accumulated transcript.
     let isFinal: Bool
-    let timestamp: Date
-    /// VAD state at the time this chunk was produced.
-    /// Defaults to `.speaking` so existing construction sites are unaffected.
-    let vadState: VADState
-
-    init(text: String, isFinal: Bool, timestamp: Date, vadState: VADState = .speaking) {
-        self.text = text
-        self.isFinal = isFinal
-        self.timestamp = timestamp
-        self.vadState = vadState
-    }
-
-    /// Convenience: a pure VAD transition event with no transcript text.
-    static func vadEvent(_ state: VADState) -> TranscriptionChunk {
-        TranscriptionChunk(text: "", isFinal: false, timestamp: Date(), vadState: state)
-    }
 }
 
-enum STTError: Error, Equatable {
+nonisolated enum STTError: Error, Equatable {
     case notAuthorized
     case noMicrophoneAccess
     case engineNotAvailable
     case alignmentFailed
     case unknown(String)
+
+    /// Fatal errors should not be retried by the supervisor (e.g. the user
+    /// denied permissions — retrying can never succeed).
+    var isFatal: Bool {
+        switch self {
+        case .notAuthorized, .noMicrophoneAccess: return true
+        default: return false
+        }
+    }
 }
 
-protocol STTEngine: AnyObject {
+/// A speech-to-text engine that consumes a shared audio stream and produces
+/// transcription chunks.
+///
+/// Contract:
+/// - `start(audio:)` returns a stream that finishes only when the audio stream
+///   finishes or `stop()` is called. Transient recognition failures must be
+///   handled *internally* (engines recreate their recognition sessions); the
+///   supervisor treats a finished stream as "engine down" and restarts.
+/// - Engines must consume audio events in order, on a single task.
+nonisolated protocol STTEngine: AnyObject {
     var displayName: String { get }
-    var isRunning: Bool { get }
-
-    /// Creates a fresh transcription stream. Callers should consume the returned stream directly.
-    func makeTranscriptionStream() -> AsyncStream<TranscriptionChunk>
 
     func setContextualStrings(from script: String)
 
+    /// Acquire permissions / load models. May be called repeatedly.
     func prepare() async throws
-    func start() async throws
+
+    /// Begin transcribing the given audio stream.
+    func start(audio: AsyncStream<AudioCaptureEvent>) async throws -> AsyncStream<TranscriptionChunk>
+
+    /// Force the engine to finalize the current utterance now (called at VAD
+    /// end-of-turn). Engines emit a final chunk and begin a fresh session.
+    func finishUtterance()
+
     func stop() async
 }
 
 extension STTEngine {
-    func setContextualStrings(from script: String) {}
+    nonisolated func setContextualStrings(from script: String) {}
+    nonisolated func finishUtterance() {}
 }
 
 // MARK: - Audio Utilities
 
-/// Root-mean-square energy of a float PCM buffer. Used by both STT engines for VAD.
-func audioRMS(_ samples: [Float]) -> Float {
+/// Root-mean-square energy of a float PCM buffer.
+nonisolated func audioRMS(_ samples: [Float]) -> Float {
     guard !samples.isEmpty else { return 0 }
     let sumSq = samples.reduce(0) { $0 + $1 * $1 }
     return sqrt(sumSq / Float(samples.count))
@@ -65,7 +80,7 @@ func audioRMS(_ samples: [Float]) -> Float {
 
 /// Pointer-based variant — avoids allocating an intermediate `[Float]` when the
 /// raw channel data is already available from `AVAudioPCMBuffer.floatChannelData`.
-func audioRMS(_ pointer: UnsafePointer<Float>, count: Int) -> Float {
+nonisolated func audioRMS(_ pointer: UnsafePointer<Float>, count: Int) -> Float {
     guard count > 0 else { return 0 }
     var sumSq: Float = 0
     for i in 0..<count { sumSq += pointer[i] * pointer[i] }

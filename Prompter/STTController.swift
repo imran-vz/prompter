@@ -2,8 +2,21 @@
 //  STTController.swift
 //  Prompter
 //
-//  Orchestrates speech-to-text and alignment.
-//  Alignment runs on a background actor; only UI updates touch main thread.
+//  Supervises the speech-to-text pipeline:
+//
+//      AudioCaptureService ──► STT engine ──► transcription chunks ─┐
+//              │                                                    ├─► alignment ─► UI
+//              └────────────► VAD (in-order, adaptive) ─────────────┘
+//
+//  Stability principles:
+//  - One supervisor task owns the whole chain. If any link dies (recognition
+//    stream ends, capture fails), the chain is torn down and restarted with
+//    backoff. The pipeline can only be "off" if the user turned it off or
+//    permissions are denied.
+//  - VAD is advisory: it gates scrolling and detects end-of-turn, but can never
+//    drop a transcript. Words coming out of the recognizer count as speech.
+//  - Alignment runs through a single coalescing worker: always aligns the
+//    newest transcript, delivers results to the main thread strictly in order.
 //
 
 import Foundation
@@ -11,30 +24,55 @@ import Combine
 
 @MainActor
 final class STTController: ObservableObject {
-    @Published var isRunning = false
-    @Published var lastTranscript = ""
-    @Published var lastAlignment: AlignmentResult?
-    /// Current VAD state — updated as the engine emits transition events.
-    @Published var vadState: VADState = .silence
+
+    enum PipelineStatus: Equatable {
+        case idle
+        case starting
+        case listening
+        case restarting
+        case failed(String)
+    }
+
+    // MARK: - Published State
+
+    @Published private(set) var status: PipelineStatus = .idle
+    @Published private(set) var lastTranscript = ""
+    @Published private(set) var lastAlignment: AlignmentResult?
+    @Published private(set) var vadState: VADState = .silence
+
+    var isRunning: Bool { runTask != nil }
 
     /// Called on main thread when alignment completes. Set by ViewModel.
     var onAlignment: ((AlignmentResult) -> Void)?
 
     /// Called on main thread when a turn ends (speech → silence after hangover).
-    /// Receives the committed transcript text — mirrors Pindrop's `endOfUtteranceCallback`.
+    /// Receives the committed transcript text.
     var onEndOfUtterance: ((String) -> Void)?
 
+    // MARK: - Pipeline Components
+
     private var engine: STTEngine
+    private let capture = AudioCaptureService()
     private let aligner = TranscriptAligner()
-    private var transcriptionTask: Task<Void, Never>?
+    private var vad = VADDetector()
+
+    private var runTask: Task<Void, Never>?
+    /// Bumped on every stop/engine-swap; stale supervisor loops see a mismatch
+    /// and exit instead of fighting the new one for the capture service.
+    private var generation = 0
 
     private var accumulatedTranscript = ""
     private var currentScript = ""
+
+    // Alignment coalescing (all MainActor; the align itself runs on the actor)
+    private var pendingAlignment: (text: String, isFinal: Bool)?
+    private var alignmentWorker: Task<Void, Never>?
 
     // MARK: - Init
 
     init(script: String = "", engine: STTEngine? = nil) {
         self.engine = engine ?? AppleSpeechEngine()
+        self.currentScript = script
         Task { await aligner.updateScript(script) }
         self.engine.setContextualStrings(from: script)
     }
@@ -48,103 +86,121 @@ final class STTController: ObservableObject {
     }
 
     func setEngine(_ newEngine: STTEngine) {
-        let script = currentScript
-        if isRunning {
-            Task {
-                await stop()
-                engine = newEngine
-                engine.setContextualStrings(from: script)
-                await start()
-            }
-        } else {
-            engine = newEngine
-            engine.setContextualStrings(from: script)
-        }
+        let wasRunning = isRunning
+        stop()
+        engine = newEngine
+        engine.setContextualStrings(from: currentScript)
+        if wasRunning { start() }
     }
 
-    func start() async {
-        guard !isRunning else { return }
+    func start() {
+        guard runTask == nil else { return }
+        generation += 1
+        let gen = generation
+        status = .starting
         accumulatedTranscript = ""
+        vad.reset()
         vadState = .silence
-        do {
-            try await engine.prepare()
-            let stream = engine.makeTranscriptionStream()
-            try await engine.start()
-            isRunning = true
-            listen(to: stream)
-        } catch {
-            // Errors are non-fatal; STT simply won't run
-        }
+        runTask = Task { await self.supervise(generation: gen) }
     }
 
-    func stop() async {
-        guard isRunning else { return }
-        await engine.stop()
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        isRunning = false
+    func stop() {
+        generation += 1
+        runTask?.cancel()
+        runTask = nil
+        capture.stop()
+        status = .idle
+        vadState = .silence
     }
 
     func resetAlignment() {
         accumulatedTranscript = ""
         lastTranscript = ""
         lastAlignment = nil
+        pendingAlignment = nil
         Task { await aligner.reset() }
     }
 
-    // MARK: - Private
+    // MARK: - Supervisor
 
-    private func listen(to stream: AsyncStream<TranscriptionChunk>) {
-        transcriptionTask?.cancel()
-        transcriptionTask = Task { [weak self] in
-            guard let self else { return }
-            for await chunk in stream {
-                guard !Task.isCancelled else { return }
-                self.process(chunk)
+    private func supervise(generation gen: Int) async {
+        var backoff: TimeInterval = 0.5
+        let engine = self.engine
+
+        while gen == generation, !Task.isCancelled {
+            do {
+                try await engine.prepare()
+                guard gen == generation, !Task.isCancelled else { break }
+
+                // Subscribe before starting capture so no chunk is missed.
+                let engineAudio = capture.subscribe()
+                let vadAudio = capture.subscribe()
+                let transcripts = try await engine.start(audio: engineAudio)
+                guard gen == generation, !Task.isCancelled else {
+                    await engine.stop()
+                    break
+                }
+                try capture.start()
+                status = .listening
+                backoff = 0.5
+
+                // Run both consumers; if either finishes, the chain is broken —
+                // tear down and let the outer loop restart it.
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask { [weak self] in
+                        for await event in vadAudio {
+                            guard let self, !Task.isCancelled else { return }
+                            if case .chunk(let chunk) = event {
+                                await self.processVAD(rms: chunk.rms)
+                            }
+                        }
+                    }
+                    group.addTask { [weak self] in
+                        for await chunk in transcripts {
+                            guard let self, !Task.isCancelled else { return }
+                            await self.processTranscript(chunk)
+                        }
+                    }
+                    await group.next()
+                    group.cancelAll()
+                }
+                await engine.stop()
+            } catch let error as STTError where error.isFatal {
+                await engine.stop()
+                if gen == generation { status = .failed(Self.describe(error)) }
+                return
+            } catch {
+                await engine.stop()
             }
+
+            if gen == generation { capture.stop() }
+            guard gen == generation, !Task.isCancelled else { break }
+
+            status = .restarting
+            print("[STTController] Pipeline ended — restarting in \(backoff)s")
+            try? await Task.sleep(for: .seconds(backoff))
+            backoff = min(backoff * 2, 5)
         }
     }
 
-    private func process(_ chunk: TranscriptionChunk) {
-        // VAD-only event (guard isFinal: Apple Speech emits text:"" on error, not a VAD event)
-        if chunk.text.isEmpty && !chunk.isFinal {
-            handleVADTransition(to: chunk.vadState)
-            return
-        }
-
-        guard vadState != .silence else { return }
-
-        lastTranscript = chunk.text
-
-        let textToAlign: String
-        let isFinal = chunk.isFinal
-
-        if isFinal {
-            accumulatedTranscript = merge(accumulated: accumulatedTranscript, final: chunk.text)
-            textToAlign = accumulatedTranscript
-        } else {
-            guard !chunk.text.split(whereSeparator: \.isWhitespace).isEmpty else { return }
-            textToAlign = chunk.text
-        }
-
-        Task.detached(priority: .high) { [weak self] in
-            guard let self else { return }
-            let (result, seq) = await self.aligner.align(transcript: textToAlign, isFinal: isFinal)
-
-            guard let result,
-                  result.confidence >= (isFinal ? 0.25 : 0.30),
-                  await self.aligner.isCurrent(seq) else { return }
-
-            await MainActor.run {
-                self.lastAlignment = result
-                self.onAlignment?(result)
-            }
+    private static func describe(_ error: STTError) -> String {
+        switch error {
+        case .noMicrophoneAccess: return "Microphone access denied"
+        case .notAuthorized: return "Speech recognition not authorized"
+        case .engineNotAvailable: return "Speech engine unavailable"
+        default: return "Speech recognition failed"
         }
     }
 
-    // MARK: - VAD / Turn Detection
+    // MARK: - VAD
 
-    private func handleVADTransition(to newState: VADState) {
+    private func processVAD(rms: Float) {
+        let now = Date().timeIntervalSinceReferenceDate
+        let (newState, changed) = vad.process(rms: rms, now: now)
+        if changed { applyVADTransition(to: newState) }
+    }
+
+    private func applyVADTransition(to newState: VADState) {
         let previous = vadState
         vadState = newState
         #if DEBUG
@@ -157,29 +213,63 @@ final class STTController: ObservableObject {
         }
     }
 
-    /// Fire a final alignment with the accumulated transcript and notify the ViewModel
-    /// that the teleprompter position should be locked until speech resumes.
+    /// Ask the engine to commit the current utterance, lock the teleprompter
+    /// position, and fire a final alignment with the accumulated transcript.
     private func commitTurnEnd() {
+        engine.finishUtterance()
+
         let transcript = accumulatedTranscript
         guard !transcript.isEmpty else { return }
-
-        // Notify immediately — position freeze must not depend on alignment succeeding,
-        // since in-flight alignment tasks may have already incremented the sequence counter.
         onEndOfUtterance?(transcript)
+        scheduleAlignment(text: transcript, isFinal: true)
+    }
 
-        Task.detached(priority: .high) { [weak self] in
-            guard let self else { return }
-            let (result, seq) = await self.aligner.align(transcript: transcript, isFinal: true)
+    // MARK: - Transcripts
 
-            guard let result,
-                  result.confidence >= 0.25,
-                  await self.aligner.isCurrent(seq) else { return }
+    private func processTranscript(_ chunk: TranscriptionChunk) {
+        let text = chunk.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
 
-            await MainActor.run {
+        lastTranscript = text
+
+        // Words arriving from the recognizer outrank energy thresholds:
+        // never let a miscalibrated VAD freeze the prompter mid-read.
+        let now = Date().timeIntervalSinceReferenceDate
+        let (newState, changed) = vad.noteSpeechEvidence(now: now)
+        if changed { applyVADTransition(to: newState) }
+
+        if chunk.isFinal {
+            accumulatedTranscript = merge(accumulated: accumulatedTranscript, final: text)
+            scheduleAlignment(text: accumulatedTranscript, isFinal: true)
+        } else {
+            scheduleAlignment(text: text, isFinal: false)
+        }
+    }
+
+    // MARK: - Alignment (coalescing worker)
+
+    /// Latest-wins scheduling: if alignments queue up faster than they run,
+    /// intermediate transcripts are skipped — the newest one is always aligned,
+    /// and results reach the UI strictly in order.
+    private func scheduleAlignment(text: String, isFinal: Bool) {
+        pendingAlignment = (text, isFinal)
+        guard alignmentWorker == nil else { return }
+
+        alignmentWorker = Task { [weak self] in
+            while let self, let job = self.takePendingAlignment() {
+                let result = await self.aligner.align(transcript: job.text, isFinal: job.isFinal)
+                guard let result,
+                      result.confidence >= (job.isFinal ? 0.25 : 0.30) else { continue }
                 self.lastAlignment = result
                 self.onAlignment?(result)
             }
+            self?.alignmentWorker = nil
         }
+    }
+
+    private func takePendingAlignment() -> (text: String, isFinal: Bool)? {
+        defer { pendingAlignment = nil }
+        return pendingAlignment
     }
 
     // MARK: - Transcript Merging
@@ -191,6 +281,9 @@ final class STTController: ObservableObject {
 
         let wa = a.split(whereSeparator: \.isWhitespace).map(String.init)
         let wf = f.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !wa.isEmpty, !wf.isEmpty else {
+            return accumulated.isEmpty ? final : accumulated
+        }
 
         var overlap = 0
         for n in 1...min(wa.count, wf.count) {

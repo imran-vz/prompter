@@ -1,33 +1,33 @@
 import Speech
 import AVFoundation
 
-@MainActor
-final class AppleSpeechEngine: NSObject, STTEngine, SFSpeechRecognizerDelegate {
+/// Apple on-device speech recognition, fed from the shared audio pipeline.
+///
+/// Recognition sessions are *self-healing*: SFSpeechRecognitionTask ends on its
+/// own (errors, ~1-minute on-device limits, finals after pauses). Whenever the
+/// current session ends, a fresh request/task pair is created on the next audio
+/// chunk and transcription continues seamlessly. Each session's final text is
+/// emitted as an `isFinal` chunk, which the controller merges into the
+/// accumulated transcript.
+nonisolated final class AppleSpeechEngine: STTEngine, @unchecked Sendable {
     var displayName: String { "Apple Speech" }
-    private(set) var isRunning: Bool = false
 
     private let recognizer: SFSpeechRecognizer?
+
+    private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
-    private let audioEngine = AVAudioEngine()
-
-    private var streamContinuation: AsyncStream<TranscriptionChunk>.Continuation?
+    private var sessionEnded = true
+    private var lastSessionStart: TimeInterval = -.greatestFiniteMagnitude
     private var contextualStrings: [String] = []
 
-    // VAD
-    private let vad = VADDetector()
-    private let vadLock = NSLock()
-    private var _cachedVADState: VADState = .speaking
-    private var cachedVADState: VADState {
-        get { vadLock.withLock { _cachedVADState } }
-        set { vadLock.withLock { _cachedVADState = newValue } }
+    private var consumeTask: Task<Void, Never>?
+
+    init() {
+        self.recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     }
 
-    override init() {
-        self.recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-        super.init()
-        recognizer?.delegate = self
-    }
+    // MARK: - Contextual strings
 
     func setContextualStrings(from script: String) {
         // Extract unique words/phrases to boost recognition accuracy
@@ -44,14 +44,13 @@ final class AppleSpeechEngine: NSObject, STTEngine, SFSpeechRecognizerDelegate {
                 }
             }
         }
-        contextualStrings = Array(unique).sorted()
+        let strings = Array(unique).sorted()
+        lock.lock()
+        contextualStrings = strings
+        lock.unlock()
     }
 
-    func makeTranscriptionStream() -> AsyncStream<TranscriptionChunk> {
-        AsyncStream { continuation in
-            self.streamContinuation = continuation
-        }
-    }
+    // MARK: - Lifecycle
 
     func prepare() async throws {
         let audioGranted = await withCheckedContinuation { continuation in
@@ -59,138 +58,163 @@ final class AppleSpeechEngine: NSObject, STTEngine, SFSpeechRecognizerDelegate {
                 continuation.resume(returning: granted)
             }
         }
-        guard audioGranted else {
-            throw STTError.noMicrophoneAccess
-        }
+        guard audioGranted else { throw STTError.noMicrophoneAccess }
 
         let speechStatus = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status)
             }
         }
-        guard speechStatus == .authorized else {
-            throw STTError.notAuthorized
-        }
+        guard speechStatus == .authorized else { throw STTError.notAuthorized }
     }
 
-    func start() async throws {
-        guard !isRunning else { return }
-        guard let recognizer = recognizer, recognizer.isAvailable else {
+    func start(audio: AsyncStream<AudioCaptureEvent>) async throws -> AsyncStream<TranscriptionChunk> {
+        guard let recognizer, recognizer.isAvailable else {
             throw STTError.engineNotAvailable
         }
 
-        try await prepare()
-        await vad.reset()
+        let (stream, continuation) = AsyncStream.makeStream(of: TranscriptionChunk.self)
 
-        audioEngine.stop()
-        audioEngine.reset()
-        audioEngine.inputNode.removeTap(onBus: 0)
-
-        request = SFSpeechAudioBufferRecognitionRequest()
-        guard let request = request else {
-            throw STTError.unknown("Failed to create recognition request")
-        }
-        request.shouldReportPartialResults = true
-        request.taskHint = .dictation
-        request.requiresOnDeviceRecognition = true   // on-device = ~200ms faster
-        if !contextualStrings.isEmpty {
-            request.contextualStrings = contextualStrings
-        }
-
-        isRunning = true
-
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
-
-            if let _ = error {
-                self.streamContinuation?.yield(TranscriptionChunk(text: "", isFinal: true, timestamp: Date()))
-                self.streamContinuation?.finish()
-                Task { await self.stop() }
-                return
-            }
-
-            guard let result = result else { return }
-
-            let chunk = TranscriptionChunk(
-                text: result.bestTranscription.formattedString,
-                isFinal: result.isFinal,
-                timestamp: Date(),
-                vadState: self.cachedVADState
-            )
-            self.streamContinuation?.yield(chunk)
-
-            if result.isFinal {
-                self.streamContinuation?.finish()
-            }
-        }
-
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 512, format: recordingFormat) { [weak self] buffer, _ in
-            guard let self = self else { return }
-
-            // Compute RMS for VAD directly from the buffer pointer — no array allocation needed.
-            let rms: Float
-            if let data = buffer.floatChannelData?[0] {
-                rms = audioRMS(data, count: Int(buffer.frameLength))
-            } else {
-                rms = 0
-            }
-
-            Task { [weak self] in
-                guard let self else { return }
-                let (newState, changed) = await self.vad.process(rms: rms)
-                self.cachedVADState = newState
-                if changed {
-                    self.streamContinuation?.yield(.vadEvent(newState))
+        // One task consumes audio in order — no per-buffer task spawning.
+        consumeTask = Task.detached(priority: .userInitiated) { [weak self] in
+            for await event in audio {
+                guard let self, !Task.isCancelled else { break }
+                switch event {
+                case .formatChanged:
+                    // Buffer format may differ now — the old request would choke.
+                    self.markSessionEnded()
+                case .chunk(let chunk):
+                    self.appendChunk(chunk, continuation: continuation)
                 }
             }
-
-            // Note: cachedVADState is updated asynchronously by the Task above.
-            // Reading it here gives the state from the *previous* buffer (≈11ms lag),
-            // which is acceptable — same pattern as MicState.shared.isMuted.
-            let isSilent = MicState.shared.isMuted || (self.cachedVADState == .silence)
-            if isSilent {
-                guard let silent = self.silentBuffer(matching: buffer) else { return }
-                self.request?.append(silent)
-            } else {
-                self.request?.append(buffer)
+            // Audio ended (not a cancellation): ask the recognizer to commit
+            // and wait briefly for its final result so trailing words reach the
+            // stream before it closes. Skipped on cancellation — that's a
+            // deliberate teardown where nothing downstream is listening.
+            if !Task.isCancelled {
+                await self?.drainFinalResult()
             }
+            self?.endSession()
+            continuation.finish()
+            print("[AppleSpeechEngine] Audio stream ended")
         }
 
-        audioEngine.prepare()
-        try audioEngine.start()
-        print("[AppleSpeechEngine] Recognition task and audio engine started")
+        return stream
     }
 
-    private func silentBuffer(matching buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
-        guard let silentBuffer = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameCapacity) else { return nil }
-        silentBuffer.frameLength = buffer.frameLength
-        for i in 0..<Int(buffer.format.channelCount) {
-            guard let channelData = silentBuffer.floatChannelData?[i] else { continue }
-            for frame in 0..<Int(silentBuffer.frameLength) {
-                channelData[frame] = 0
+    /// End the current request's audio and wait (bounded) for the recognition
+    /// callback to deliver the final result. The callback yields the final to
+    /// the continuation and then sets `sessionEnded`, which is our signal.
+    private func drainFinalResult() async {
+        let (active, ended) = lock.withLock { (request, sessionEnded) }
+        guard let active, !ended else { return }
+        active.endAudio()
+        for _ in 0..<20 {   // up to ~1s
+            try? await Task.sleep(for: .milliseconds(50))
+            if Task.isCancelled { return }
+            if lock.withLock({ sessionEnded }) { return }
+        }
+    }
+
+    private func appendChunk(_ chunk: AudioChunk,
+                             continuation: AsyncStream<TranscriptionChunk>.Continuation) {
+        lock.lock()
+        let ended = sessionEnded
+        let sinceStart = Date().timeIntervalSinceReferenceDate - lastSessionStart
+        lock.unlock()
+
+        if ended {
+            // Throttle session creation so a recognizer that fails instantly
+            // (e.g. temporarily unavailable) doesn't spin at audio-buffer rate.
+            guard sinceStart > 0.5 else { return }
+            startSession(continuation: continuation)
+        }
+
+        lock.lock()
+        let activeRequest = request
+        lock.unlock()
+        activeRequest?.append(chunk.buffer)
+    }
+
+    private func startSession(continuation: AsyncStream<TranscriptionChunk>.Continuation) {
+        guard let recognizer else { return }
+
+        let newRequest = SFSpeechAudioBufferRecognitionRequest()
+        newRequest.shouldReportPartialResults = true
+        newRequest.taskHint = .dictation
+        newRequest.requiresOnDeviceRecognition = true   // on-device = ~200ms faster
+
+        lock.lock()
+        if !contextualStrings.isEmpty {
+            newRequest.contextualStrings = contextualStrings
+        }
+        // Tear down any previous task before installing the new session.
+        task?.cancel()
+        request = newRequest
+        sessionEnded = false
+        lastSessionStart = Date().timeIntervalSinceReferenceDate
+        lock.unlock()
+
+        let newTask = recognizer.recognitionTask(with: newRequest) { [weak self] result, error in
+            guard let self else { return }
+
+            if let result {
+                let text = result.bestTranscription.formattedString
+                if !text.isEmpty {
+                    continuation.yield(TranscriptionChunk(text: text, isFinal: result.isFinal))
+                }
+                if result.isFinal {
+                    self.markSessionEnded()
+                }
+            }
+            if error != nil {
+                self.markSessionEnded()
             }
         }
-        return silentBuffer
+
+        lock.lock()
+        task = newTask
+        lock.unlock()
+        print("[AppleSpeechEngine] Recognition session started")
+    }
+
+    private func markSessionEnded() {
+        lock.lock()
+        sessionEnded = true
+        let active = request
+        lock.unlock()
+        active?.endAudio()
+    }
+
+    /// VAD detected end of turn — ask the recognizer to commit the current
+    /// utterance. The final result arrives through the normal callback and the
+    /// session restarts on the next audio chunk.
+    func finishUtterance() {
+        lock.lock()
+        let active = request
+        lock.unlock()
+        active?.endAudio()
+    }
+
+    private func endSession() {
+        let (activeRequest, activeTask) = lock.withLock {
+            let pair = (request, task)
+            request = nil
+            task = nil
+            sessionEnded = true
+            return pair
+        }
+        activeRequest?.endAudio()
+        activeTask?.cancel()
     }
 
     func stop() async {
-        guard isRunning else { return }
-        isRunning = false
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        task?.cancel()
-        task = nil
-        request = nil
-        streamContinuation?.finish()
-        streamContinuation = nil
+        let consume = consumeTask
+        consumeTask = nil
+        consume?.cancel()
+        // Join the consumer so it can't touch session state after we return.
+        _ = await consume?.value
+        endSession()
         print("[AppleSpeechEngine] Stopped")
-    }
-
-    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
-        if !available {
-            Task { await stop() }
-        }
     }
 }

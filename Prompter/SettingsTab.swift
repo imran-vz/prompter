@@ -655,6 +655,11 @@ struct SpeechTabView: View {
                         subtitle: "Automatically scroll the prompter as you speak",
                         isOn: $viewModel.sttEnabled
                     )
+
+                    if viewModel.sttEnabled {
+                        Divider().opacity(0.3)
+                        PipelineStatusRow(controller: viewModel.sttController)
+                    }
                 }
 
                 SectionHeader(title: "Engine")
@@ -724,6 +729,47 @@ struct SpeechTabView: View {
                 }
             }
             .padding(16)
+        }
+    }
+}
+
+// MARK: - Pipeline Status
+
+/// Live state of the speech pipeline, so a stalled or failed pipeline is
+/// always visible instead of silently not scrolling.
+struct PipelineStatusRow: View {
+    @ObservedObject var controller: STTController
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 7, height: 7)
+            Text(statusText)
+                .font(DS.sublabel)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+    }
+
+    private var statusText: String {
+        switch controller.status {
+        case .idle: return "Off"
+        case .starting: return "Starting…"
+        case .listening:
+            return controller.vadState == .silence ? "Listening" : "Hearing speech"
+        case .restarting: return "Reconnecting…"
+        case .failed(let reason): return reason
+        }
+    }
+
+    private var statusColor: Color {
+        switch controller.status {
+        case .idle: return .gray
+        case .starting, .restarting: return .yellow
+        case .listening:
+            return controller.vadState == .silence ? .green : .accentColor
+        case .failed: return .red
         }
     }
 }
