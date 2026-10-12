@@ -14,17 +14,21 @@ final class PrompterViewModel: ObservableObject {
 
     // MARK: - Published State
 
+    /// First-run Script: doubles as a short guide the user can read aloud.
     @Published var text: String = """
         Welcome to Prompter.
 
-        This is a clean, AI-ready teleprompter base for macOS.
-        Add your own STT integration to track speech and auto-scroll.
+        This text sits just under your notch. Hover over it for controls, or scroll it by hand with your trackpad.
 
-        Features included:
-        • Smooth scrolling with adjustable speed
-        • Customizable fonts and themes
-        • Hover controls and pause on hover
-        • Progress bar tracking
+        To use your own words, open Settings from the menu bar icon and paste your script into the Script tab, or import a text file.
+
+        Press Play to scroll at a steady speed. Or turn on Speech Tracking in the Speech tab and read aloud. Prompter listens on your Mac, follows along, and highlights each word as you say it.
+
+        [pause]
+
+        Words in square brackets are stage directions. They are dimmed, and Prompter doesn't expect you to say them.
+
+        Happy recording.
         """
 
     @Published var isPlaying = false
@@ -48,20 +52,33 @@ final class PrompterViewModel: ObservableObject {
     @Published var textAlignment: PrompterTextAlignment = .center
     @Published var showProgressBar = true
     @Published var followActiveDisplay = true
+    /// Keep the Prompter out of screen sharing and recordings.
+    @Published var hideFromScreenSharing = true
+    /// ⌃⌥⌘ shortcuts that work while another app is focused.
+    @Published var globalShortcutsEnabled = true
 
     // STT
     @Published var sttEnabled = false
     @Published var sttSmoothing: Double = 0.2
     @Published var sttReadUpToOffset = 0
+    @Published var sttCurrentWordRange: NSRange?
     @Published var readingLineOffset: Double = 0.35
     @Published var contentHeight: CGFloat = 0
     @Published var sttEngineType: STTEngineType = .apple
     @Published var whisperKitModel = "tiny"
     @Published var micMuted = false
+    /// Recognition language identifier, or "" to follow the system language.
+    @Published var speechLanguage = ""
 
     var backScrollAmount: Double = 30.0
 
     let sttController: STTController
+
+    /// Space above the Script inside the Prompter, clear of the notch.
+    static let scriptTopInset: CGFloat = 40
+
+    /// Set by the Prompter's text view; maps Script offsets to screen lines.
+    weak var layoutProvider: ScriptLayoutProviding?
 
     // MARK: - Private
 
@@ -77,14 +94,18 @@ final class PrompterViewModel: ObservableObject {
     init() {
         sttController = STTController(script: "")
         loadSettings()
+        sttController.setLocale(speechLocale)
         updateEngine()
         sttController.updateScript(text)
         sttController.onAlignment = { [weak self] in self?.handleAlignment($0) }
         startTimer()
         observeSettingsChanges()
 
-        if sttEnabled { syncSTTState(enabled: true) }
+        if sttEnabled, !Self.isRunningTests { syncSTTState(enabled: true) }
     }
+
+    /// True when hosting unit tests: no microphone, no permission prompts.
+    static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     /// Maximum scroll offset — stop when the last text is still visible,
     /// leaving 25% of the prompter height as bottom padding.
@@ -104,6 +125,7 @@ final class PrompterViewModel: ObservableObject {
         targetOffset = 0
         lastTick = nil
         sttReadUpToOffset = 0
+        sttCurrentWordRange = nil
         sttController.resetAlignment()
 
         if sttEnabled {
@@ -114,6 +136,20 @@ final class PrompterViewModel: ObservableObject {
 
     func scrollBack() {
         offset = max(0, offset - backScrollAmount)
+        lastManualScrollTime = Date()
+    }
+
+    /// Replace the Script with the contents of a text, Markdown, RTF or Word file.
+    func importScript(from url: URL) throws {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        switch url.pathExtension.lowercased() {
+        case "rtf", "rtfd", "doc", "docx", "odt", "html", "htm":
+            text = try NSAttributedString(url: url, options: [:], documentAttributes: nil).string
+        default:
+            text = try String(contentsOf: url, encoding: .utf8)
+        }
     }
 
     func applyManualScroll(delta: CGFloat) {
@@ -131,10 +167,17 @@ final class PrompterViewModel: ObservableObject {
         }
     }
 
+    var speechLocale: Locale {
+        speechLanguage.isEmpty ? .current : Locale(identifier: speechLanguage)
+    }
+
     private func updateEngine() {
+        let locale = speechLocale
         let engine: STTEngine = (sttEngineType == .apple)
-            ? AppleSpeechEngine()
-            : WhisperKitEngine(modelName: whisperKitModel)
+            ? AppleSpeechEngine(locale: locale)
+            : WhisperKitEngine(modelName: whisperKitModel,
+                               language: locale.language.languageCode?.identifier)
+        sttController.setLocale(locale)
         sttController.setEngine(engine)
         sttController.updateScript(text)
     }
@@ -142,8 +185,15 @@ final class PrompterViewModel: ObservableObject {
     private func handleAlignment(_ result: AlignmentResult) {
         guard sttEnabled, contentHeight > 0, result.confidence >= 0.25 else { return }
 
-        let newTarget = CGFloat(result.progress) * contentHeight
-            - CGFloat(readingLineOffset) * prompterHeight
+        // Put the line holding the Current word on the Reading position. The
+        // word-count fraction is only a fallback before the text is laid out.
+        let wordY: CGFloat
+        if let lineY = layoutProvider?.lineMidY(forUTF16Offset: result.currentWordRange.location) {
+            wordY = Self.scriptTopInset + lineY
+        } else {
+            wordY = CGFloat(result.progress) * contentHeight
+        }
+        let newTarget = wordY - CGFloat(readingLineOffset) * prompterHeight
         let clamped = max(0, min(newTarget, maxOffset))
 
         let backwardThreshold: CGFloat = 60
@@ -154,6 +204,7 @@ final class PrompterViewModel: ObservableObject {
         }
 
         sttReadUpToOffset = result.readUpToOffset
+        sttCurrentWordRange = result.currentWordRange
     }
 
     // MARK: - Display Link Tick
@@ -167,9 +218,18 @@ final class PrompterViewModel: ObservableObject {
             .sink { [weak self] ts in self?.tick(current: ts) }
     }
 
+    /// Runs every display frame. Works on a local copy and publishes `offset`
+    /// only when it actually moves: every `@Published` write re-renders the
+    /// Prompter, and doing that each frame while idle cost ~55% CPU.
     private func tick(current: CFTimeInterval) {
         let dt: CFTimeInterval = lastTick.map { current - $0 } ?? 0
         lastTick = current
+
+        var offset = self.offset
+        defer {
+            offset = offset.clamped(to: 0...maxOffset)
+            if abs(offset - self.offset) > 0.01 { self.offset = offset }
+        }
 
         if isPlaying {
             offset += CGFloat(speed) * CGFloat(dt)
@@ -194,8 +254,6 @@ final class PrompterViewModel: ObservableObject {
                 offset += step
             }
         }
-
-        offset = offset.clamped(to: 0...maxOffset)
     }
 
     // MARK: - Settings Persistence
@@ -226,6 +284,9 @@ final class PrompterViewModel: ObservableObject {
         static let sttEngine = "STTEngineType"
         static let whisperModel = "WhisperKitModel"
         static let micMuted = "MicMuted"
+        static let hideFromSharing = "HideFromScreenSharing"
+        static let globalShortcuts = "GlobalShortcutsEnabled"
+        static let speechLanguage = "SpeechLanguage"
     }
 
     /// Observe all published properties and auto-persist changes.
@@ -252,6 +313,8 @@ final class PrompterViewModel: ObservableObject {
             $sttSmoothing.map { _ in }.eraseToAnyPublisher(),
             $readingLineOffset.map { _ in }.eraseToAnyPublisher(),
             $followActiveDisplay.map { _ in }.eraseToAnyPublisher(),
+            $hideFromScreenSharing.map { _ in }.eraseToAnyPublisher(),
+            $globalShortcutsEnabled.map { _ in }.eraseToAnyPublisher(),
         ]
 
         Publishers.MergeMany(saveOnly)
@@ -259,12 +322,23 @@ final class PrompterViewModel: ObservableObject {
             .sink { [weak self] in self?.saveSettings() }
             .store(in: &cancellables)
 
-        // Text: also update STT script
-        $text
+        // Text: update the STT script and start over from the top, including
+        // the speech-tracking target, or tracking would drag the Prompter back.
+        $text.dropFirst()
             .sink { [weak self] t in
-                self?.sttController.updateScript(t)
-                self?.saveSettings()
+                guard let self else { return }
+                self.sttController.updateScript(t)
+                self.sttController.resetAlignment()
+                self.offset = 0
+                self.targetOffset = 0
+                self.sttReadUpToOffset = 0
+                self.sttCurrentWordRange = nil
+                self.saveSettings()
             }
+            .store(in: &cancellables)
+
+        $speechLanguage.dropFirst()
+            .sink { [weak self] _ in self?.saveSettings(); self?.updateEngine() }
             .store(in: &cancellables)
 
         // STT enabled: start/stop engine
@@ -321,6 +395,9 @@ final class PrompterViewModel: ObservableObject {
         sttEngineType     = d.string(forKey: K.sttEngine).flatMap(STTEngineType.init) ?? .apple
         whisperKitModel   = d.string(forKey: K.whisperModel) ?? "tiny"
         micMuted          = d.object(forKey: K.micMuted) as? Bool ?? false
+        hideFromScreenSharing = d.object(forKey: K.hideFromSharing) as? Bool ?? true
+        globalShortcutsEnabled = d.object(forKey: K.globalShortcuts) as? Bool ?? true
+        speechLanguage    = d.string(forKey: K.speechLanguage) ?? ""
         MicState.shared.isMuted = micMuted
     }
 
@@ -351,6 +428,9 @@ final class PrompterViewModel: ObservableObject {
         d.set(sttEngineType.rawValue, forKey: K.sttEngine)
         d.set(whisperKitModel, forKey: K.whisperModel)
         d.set(micMuted, forKey: K.micMuted)
+        d.set(hideFromScreenSharing, forKey: K.hideFromSharing)
+        d.set(globalShortcutsEnabled, forKey: K.globalShortcuts)
+        d.set(speechLanguage, forKey: K.speechLanguage)
     }
 }
 

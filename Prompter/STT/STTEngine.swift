@@ -24,6 +24,13 @@ nonisolated enum STTError: Error, Equatable {
     case notAuthorized
     case noMicrophoneAccess
     case engineNotAvailable
+    /// The on-device speech model for this language isn't installed. Not
+    /// fatal: the Pipeline keeps retrying, so it recovers once the user adds
+    /// the language in System Settings.
+    case onDeviceRecognitionUnavailable(language: String)
+    /// The selected WhisperKit Model hasn't been downloaded yet. Not fatal for
+    /// the same reason: it starts as soon as the download finishes.
+    case modelNotDownloaded(String)
     case alignmentFailed
     case unknown(String)
 

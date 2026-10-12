@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var prompterWindow: PrompterWindow!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !PrompterViewModel.isRunningTests else { return }
         prompterWindow = PrompterWindow(viewModel: viewModel)
         prompterWindow.show()
         NSApp.setActivationPolicy(.accessory)
@@ -44,16 +45,13 @@ struct MenuContent: View {
 
     var body: some View {
         Button {
-            if !viewModel.isPrompterVisible {
-                NSApp.activate(ignoringOtherApps: true)
-            }
             viewModel.isPrompterVisible.toggle()
         } label: {
             Label(
                 viewModel.isPrompterVisible ? "Hide Prompter" : "Show Prompter",
                 systemImage: viewModel.isPrompterVisible ? "eye.slash" : "eye")
         }
-        .keyboardShortcut("h", modifiers: [.command, .option])
+        .keyboardShortcut("h", modifiers: [.control, .option, .command])
 
         Divider()
 
@@ -64,13 +62,14 @@ struct MenuContent: View {
                 viewModel.isPlaying ? "Pause" : "Play",
                 systemImage: viewModel.isPlaying ? "pause.fill" : "play.fill")
         }
-        .keyboardShortcut("p", modifiers: [.command, .option])
+        .keyboardShortcut("p", modifiers: [.control, .option, .command])
 
         Button {
             viewModel.reset()
         } label: {
             Label("Reset", systemImage: "arrow.counterclockwise")
         }
+        .keyboardShortcut("r", modifiers: [.control, .option, .command])
 
         Divider()
 

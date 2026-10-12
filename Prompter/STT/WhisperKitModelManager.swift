@@ -50,6 +50,15 @@ final class WhisperKitModelManager: ObservableObject {
         downloadedModels.contains(model)
     }
 
+    /// Folder of a downloaded Model, or nil if it isn't on disk (never
+    /// downloaded, or deleted outside the app).
+    func modelFolder(for model: String) -> String? {
+        guard isDownloaded(model) else { return nil }
+        let path = modelPaths[model] ?? locateModelPath(for: model)
+        guard let path, FileManager.default.fileExists(atPath: path) else { return nil }
+        return path
+    }
+
     func lastUsedDate(for model: String) -> Date? {
         let dates = UserDefaults.standard.object(forKey: lastUsedKey) as? [String: Date] ?? [:]
         return dates[model]
@@ -72,7 +81,7 @@ final class WhisperKitModelManager: ObservableObject {
         do {
             try FileManager.default.removeItem(at: url)
         } catch {
-            print("Failed to delete model \(model): \(error)")
+            print("[WhisperKitModelManager] Failed to delete model \(model): \(error)")
         }
 
         removeFromTracking(model: model)
@@ -96,13 +105,14 @@ final class WhisperKitModelManager: ObservableObject {
 
         do {
             let contents = try FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil)
-            for url in contents {
-                if url.lastPathComponent.contains(model) {
-                    return url.path
-                }
+            // Exact match: a substring test would let "base" match (and
+            // delete) "base.en".
+            let candidates: Set<String> = [model, "openai_whisper-\(model)"]
+            if let url = contents.first(where: { candidates.contains($0.lastPathComponent) }) {
+                return url.path
             }
         } catch {
-            print("Failed to locate model path: \(error)")
+            print("[WhisperKitModelManager] Failed to locate model path: \(error)")
         }
         return nil
     }

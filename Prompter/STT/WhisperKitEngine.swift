@@ -26,8 +26,12 @@ nonisolated final class WhisperKitEngine: STTEngine, @unchecked Sendable {
     /// hallucinates on silence, and skipping saves a full model pass.
     private let energyGate: Float = 0.004
 
-    init(modelName: String) {
+    /// ISO 639-1 code passed to the decoder, or nil to let Whisper detect it.
+    private let language: String?
+
+    init(modelName: String, language: String? = nil) {
         self.modelName = modelName
+        self.language = language
     }
 
     // MARK: - Lifecycle
@@ -41,13 +45,23 @@ nonisolated final class WhisperKitEngine: STTEngine, @unchecked Sendable {
         guard audioGranted else { throw STTError.noMicrophoneAccess }
 
         if whisperKit == nil {
+            // Load only from a Model the user downloaded in Settings. Letting
+            // WhisperKit download here would hide a multi-minute (or offline,
+            // never-ending) download behind "Starting…".
+            let name = modelName
+            guard let folder = await MainActor.run(body: {
+                WhisperKitModelManager.shared.modelFolder(for: name)
+            }) else {
+                throw STTError.modelNotDownloaded(modelName)
+            }
             do {
-                whisperKit = try await WhisperKit(
+                whisperKit = try await WhisperKit(WhisperKitConfig(
                     model: modelName,
-                    verbose: true,
+                    modelFolder: folder,
+                    verbose: false,
                     logLevel: .error,
-                    download: true
-                )
+                    download: false
+                ))
             } catch {
                 throw STTError.engineNotAvailable
             }
@@ -181,7 +195,9 @@ nonisolated final class WhisperKitEngine: STTEngine, @unchecked Sendable {
         }
 
         do {
-            let results = try await whisperKit.transcribe(audioArray: samples)
+            let options = language.map { DecodingOptions(language: $0, detectLanguage: false) }
+            let results: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: samples,
+                                                                                 decodeOptions: options)
             let text = (results.first?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
             if wantsFinal {

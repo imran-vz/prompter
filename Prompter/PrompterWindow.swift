@@ -23,8 +23,9 @@ final class PrompterWindow {
     private let viewModel: PrompterViewModel
     private var cancellables: Set<AnyCancellable> = []
     private var activeDisplayTimer: Timer?
-    private var globalKeyMonitor: Any?
+    private var lastFrame: CGRect?
     private var localKeyMonitor: Any?
+    private var hotKeys: GlobalHotKeys!
 
     init(viewModel: PrompterViewModel) {
         self.viewModel = viewModel
@@ -54,6 +55,9 @@ final class PrompterWindow {
         window.isRestorable = false
         window.isExcludedFromWindowsMenu = true
         window.contentView = hosting
+        window.sharingType = viewModel.hideFromScreenSharing ? .none : .readOnly
+
+        hotKeys = GlobalHotKeys { [weak self] action in self?.handleHotKey(action) }
 
         observeViewModel()
         installKeyMonitors()
@@ -65,16 +69,24 @@ final class PrompterWindow {
 
     // MARK: - Show / Resize
 
+    /// Shows the Prompter without activating the app, so whatever the user is
+    /// presenting from keeps focus.
     func show() {
-        NSApp.activate(ignoringOtherApps: true)
-        guard let screen = selectedScreen else { window.center(); window.makeKeyAndOrderFront(nil); return }
-        window.setFrame(frame(on: screen), display: true)
-        window.makeKeyAndOrderFront(nil)
+        guard let screen = selectedScreen else { window.center(); window.orderFrontRegardless(); return }
+        setFrame(frame(on: screen), animate: false)
+        window.orderFrontRegardless()
     }
 
     private func resize() {
         guard let screen = selectedScreen else { return }
-        window.setFrame(frame(on: screen), display: true, animate: true)
+        setFrame(frame(on: screen), animate: true)
+    }
+
+    /// Skips no-op frame changes; Follow active display calls this twice a second.
+    private func setFrame(_ frame: CGRect, animate: Bool) {
+        guard frame != lastFrame || window.frame != frame else { return }
+        lastFrame = frame
+        window.setFrame(frame, display: true, animate: animate)
     }
 
     // MARK: - View-Model Bindings
@@ -105,23 +117,43 @@ final class PrompterWindow {
             .sink { [weak self] on in self?.updateDisplayTracking(on) }
             .store(in: &cancellables)
 
+        viewModel.$hideFromScreenSharing
+            .receive(on: RunLoop.main)
+            .sink { [weak self] hide in self?.window.sharingType = hide ? .none : .readOnly }
+            .store(in: &cancellables)
+
+        viewModel.$globalShortcutsEnabled
+            .receive(on: RunLoop.main)
+            .sink { [weak self] on in on ? self?.hotKeys.register() : self?.hotKeys.unregister() }
+            .store(in: &cancellables)
+
         updateDisplayTracking(viewModel.followActiveDisplay)
     }
 
     // MARK: - Keyboard Shortcuts
 
+    /// Plain keys (Space, arrows, R) only while the Prompter itself is key,
+    /// i.e. after the user clicked it. They are never watched globally: that
+    /// would toggle Playback or reset the Script while typing in other apps.
     private func installKeyMonitors() {
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             self?.handleKey(e) == true ? nil : e
         }
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] e in
-            self?.handleKey(e)
+    }
+
+    private func handleHotKey(_ action: GlobalHotKeys.Action) {
+        switch action {
+        case .togglePlay: viewModel.isPlaying ? viewModel.pause() : viewModel.play()
+        case .toggleVisible: viewModel.isPrompterVisible.toggle()
+        case .reset: viewModel.reset()
+        case .scrollUp: viewModel.applyManualScroll(delta: 30)
+        case .scrollDown: viewModel.applyManualScroll(delta: -30)
         }
     }
 
     @discardableResult
     private func handleKey(_ event: NSEvent) -> Bool {
-        guard viewModel.isPrompterVisible else { return false }
+        guard viewModel.isPrompterVisible, event.window === window else { return false }
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
 
         switch event.keyCode {
@@ -139,8 +171,7 @@ final class PrompterWindow {
 
     @objc private func spaceDidChange() {
         guard viewModel.isPrompterVisible else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     private var selectedScreen: NSScreen? {
@@ -192,8 +223,9 @@ final class PrompterWindow {
         start.origin.y = final.maxY - 4
 
         window.setFrame(start, display: false)
+        lastFrame = final
         window.alphaValue = 0.4
-        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = animDuration

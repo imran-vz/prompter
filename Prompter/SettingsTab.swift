@@ -5,7 +5,9 @@
 //  Created by Imran on 13/04/26.
 //
 
+import Speech
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Tab Definition
 
@@ -316,9 +318,41 @@ private struct SectionHeader: View {
 struct ScriptTabView: View {
     @ObservedObject var viewModel: PrompterViewModel
     @FocusState private var isTextEditorFocused: Bool
+    @State private var isImporting = false
+    @State private var importError: String?
+
+    private static let importTypes: [UTType] = [
+        .plainText, .rtf, .rtfd, .html,
+        UTType("net.daringfireball.markdown"),
+        UTType("org.openxmlformats.wordprocessingml.document"),
+        UTType("com.microsoft.word.doc"),
+        UTType("org.oasis-open.opendocument.text"),
+    ].compactMap { $0 }
+
+    private var wordCount: Int {
+        viewModel.text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("\(wordCount) words · about \(max(1, Int((Double(wordCount) / 150).rounded()))) min to read")
+                    .font(DS.sublabel)
+                    .foregroundStyle(.tertiary)
+                if let importError {
+                    Text(importError)
+                        .font(DS.sublabel)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                }
+                Spacer()
+                ToolbarButton(icon: "square.and.arrow.down", label: "Import…") {
+                    isImporting = true
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: DS.cardRadius)
                     .fill(Color(nsColor: .textBackgroundColor))
@@ -357,6 +391,14 @@ struct ScriptTabView: View {
             }
             .padding(16)
             .frame(maxHeight: .infinity)
+        }
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.importTypes) { result in
+            do {
+                try viewModel.importScript(from: result.get())
+                importError = nil
+            } catch {
+                importError = "Couldn't import: \(error.localizedDescription)"
+            }
         }
     }
 }
@@ -540,6 +582,29 @@ struct BehaviorTabView: View {
                         isOn: $viewModel.showProgressBar
                     )
                 }
+
+                SectionHeader(title: "Keyboard")
+
+                GlassCard {
+                    SettingToggle(
+                        title: "Global Shortcuts",
+                        subtitle: "⌃⌥⌘P play/pause · ⌃⌥⌘H show/hide · ⌃⌥⌘R reset · ⌃⌥⌘↑/↓ scroll, from any app",
+                        isOn: $viewModel.globalShortcutsEnabled
+                    )
+                    Text("After clicking the prompter, Space, ↑/↓, ←/→ and R also work on their own.")
+                        .font(DS.sublabel)
+                        .foregroundStyle(.quaternary)
+                }
+
+                SectionHeader(title: "Privacy")
+
+                GlassCard {
+                    SettingToggle(
+                        title: "Hide from Screen Sharing",
+                        subtitle: "Keep the prompter out of screen shares, recordings and screenshots",
+                        isOn: $viewModel.hideFromScreenSharing
+                    )
+                }
             }
             .padding(16)
         }
@@ -690,6 +755,23 @@ struct SpeechTabView: View {
                     }
                 }
 
+                SectionHeader(title: "Language")
+
+                GlassCard {
+                    Picker("", selection: $viewModel.speechLanguage) {
+                        Text("System (\(Self.name(for: .current)))").tag("")
+                        Divider()
+                        ForEach(Self.languages, id: \.identifier) { locale in
+                            Text(Self.name(for: locale)).tag(locale.identifier)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    Text("The language you read the script in")
+                        .font(DS.sublabel)
+                        .foregroundStyle(.quaternary)
+                }
+
                 SectionHeader(title: "Microphone")
 
                 GlassCard {
@@ -733,6 +815,16 @@ struct SpeechTabView: View {
     }
 }
 
+extension SpeechTabView {
+    /// Languages Apple Speech supports; WhisperKit covers these and more.
+    static let languages: [Locale] = SFSpeechRecognizer.supportedLocales()
+        .sorted { name(for: $0) < name(for: $1) }
+
+    static func name(for locale: Locale) -> String {
+        Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+    }
+}
+
 // MARK: - Pipeline Status
 
 /// Live state of the speech pipeline, so a stalled or failed pipeline is
@@ -741,14 +833,53 @@ struct PipelineStatusRow: View {
     @ObservedObject var controller: STTController
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 7, height: 7)
-            Text(statusText)
-                .font(DS.sublabel)
-                .foregroundStyle(.secondary)
-            Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 7, height: 7)
+                Text(statusText)
+                    .font(DS.sublabel)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let fix = fix {
+                    Button(fix.label) { NSWorkspace.shared.open(fix.url) }
+                        .controlSize(.small)
+                }
+            }
+            if controller.status == .restarting || controller.status == .starting,
+               let issue = controller.lastIssue {
+                Text(STTController.describe(issue) + hint(for: issue))
+                    .font(DS.sublabel)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var problem: STTError? { controller.fatalIssue ?? controller.lastIssue }
+
+    /// A System Settings pane that fixes the current problem, if there is one.
+    private var fix: (label: String, url: URL)? {
+        let pane: String
+        switch problem {
+        case .noMicrophoneAccess?: pane = "com.apple.preference.security?Privacy_Microphone"
+        case .notAuthorized?: pane = "com.apple.preference.security?Privacy_SpeechRecognition"
+        case .onDeviceRecognitionUnavailable?: pane = "com.apple.Keyboard-Settings.extension"
+        default: return nil
+        }
+        guard let url = URL(string: "x-apple.systempreferences:\(pane)") else { return nil }
+        return ("Open System Settings", url)
+    }
+
+    private func hint(for issue: STTError) -> String {
+        switch issue {
+        case .onDeviceRecognitionUnavailable:
+            return ". Add the language under Keyboard › Dictation, or pick another language."
+        case .modelNotDownloaded:
+            return ". Download it below; tracking starts once it finishes."
+        default:
+            return ". Retrying…"
         }
     }
 

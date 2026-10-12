@@ -23,8 +23,11 @@ nonisolated final class AppleSpeechEngine: STTEngine, @unchecked Sendable {
 
     private var consumeTask: Task<Void, Never>?
 
-    init() {
-        self.recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    /// - Parameter locale: recognition language; falls back to US English when
+    ///   Apple Speech doesn't support it.
+    init(locale: Locale = .current) {
+        self.recognizer = SFSpeechRecognizer(locale: locale)
+            ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     }
 
     // MARK: - Contextual strings
@@ -71,6 +74,14 @@ nonisolated final class AppleSpeechEngine: STTEngine, @unchecked Sendable {
     func start(audio: AsyncStream<AudioCaptureEvent>) async throws -> AsyncStream<TranscriptionChunk> {
         guard let recognizer, recognizer.isAvailable else {
             throw STTError.engineNotAvailable
+        }
+        // Recognition must stay on-device (privacy promise). Without the
+        // language's on-device model every session would fail instantly while
+        // the status still read "Listening", so surface it instead.
+        guard recognizer.supportsOnDeviceRecognition else {
+            let language = Locale.current.localizedString(forIdentifier: recognizer.locale.identifier)
+                ?? recognizer.locale.identifier
+            throw STTError.onDeviceRecognitionUnavailable(language: language)
         }
 
         let (stream, continuation) = AsyncStream.makeStream(of: TranscriptionChunk.self)
