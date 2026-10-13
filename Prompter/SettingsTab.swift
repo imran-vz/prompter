@@ -878,6 +878,8 @@ struct PipelineStatusRow: View {
             return ". Add the language under Keyboard › Dictation, or pick another language."
         case .modelNotDownloaded:
             return ". Download it below; tracking starts once it finishes."
+        case .modelLanguageMismatch:
+            return ". Pick a Model without “.en” below, or set the language to English."
         default:
             return ". Retrying…"
         }

@@ -155,3 +155,20 @@ struct TranscriptMergerTests {
         #expect(words.last == "end")
     }
 }
+
+// MARK: - WhisperKitEngine
+
+struct WhisperKitModelLanguageTests {
+
+    @Test func recognisesEnglishOnlyModels() {
+        for model in ["tiny.en", "small.en", "openai_whisper-base.en", "openai_whisper-small.en_217MB"] {
+            #expect(WhisperKitEngine.isEnglishOnly(model), "\(model)")
+        }
+    }
+
+    @Test func multilingualModelsAreNotEnglishOnly() {
+        for model in ["tiny", "large-v3", "openai_whisper-large-v3_947MB", "distil-whisper_distil-large-v3"] {
+            #expect(!WhisperKitEngine.isEnglishOnly(model), "\(model)")
+        }
+    }
+}

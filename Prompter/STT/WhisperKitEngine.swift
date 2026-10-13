@@ -34,6 +34,13 @@ nonisolated final class WhisperKitEngine: STTEngine, @unchecked Sendable {
         self.language = language
     }
 
+    /// Whisper's `.en` variants only recognise English. Names come either bare
+    /// ("small.en") or as repo folders, optionally with a size suffix
+    /// ("openai_whisper-small.en_217MB").
+    static func isEnglishOnly(_ model: String) -> Bool {
+        model.range(of: #"\.en($|_)"#, options: .regularExpression) != nil
+    }
+
     // MARK: - Lifecycle
 
     func prepare() async throws {
@@ -43,6 +50,12 @@ nonisolated final class WhisperKitEngine: STTEngine, @unchecked Sendable {
             }
         }
         guard audioGranted else { throw STTError.noMicrophoneAccess }
+
+        // An English-only Model fed another language still "listens" but
+        // produces nothing the aligner can match, so refuse it up front.
+        if let language, language != "en", Self.isEnglishOnly(modelName) {
+            throw STTError.modelLanguageMismatch(model: modelName, language: language)
+        }
 
         if whisperKit == nil {
             // Load only from a Model the user downloaded in Settings. Letting

@@ -27,7 +27,7 @@ Both must succeed after any Swift change. Tests cover the pure parts (tokenizer,
 
 Speech following and on-screen positioning can only be checked by running the app and reading aloud. Say so when a change can't be verified any other way.
 
-CI (`.github/workflows/ci.yml`) runs the tests unsigned. `scripts/release.sh` archives, signs with Developer ID and notarizes.
+CI (`.github/workflows/ci.yml`) runs the tests ad hoc signed (no certificate needed). `scripts/release.sh` archives, signs with Developer ID and notarizes.
 
 ## Where things live
 

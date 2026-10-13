@@ -31,6 +31,10 @@ nonisolated enum STTError: Error, Equatable {
     /// The selected WhisperKit Model hasn't been downloaded yet. Not fatal for
     /// the same reason: it starts as soon as the download finishes.
     case modelNotDownloaded(String)
+    /// The selected WhisperKit Model is English-only (`.en`) but the speech
+    /// language isn't English. Not fatal: it starts once the user picks a
+    /// multilingual Model or switches the language.
+    case modelLanguageMismatch(model: String, language: String)
     case alignmentFailed
     case unknown(String)
 

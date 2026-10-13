@@ -221,6 +221,9 @@ final class STTController: ObservableObject {
         case .onDeviceRecognitionUnavailable(let language):
             return "On-device recognition for \(language) isn't installed"
         case .modelNotDownloaded(let model): return "Model \(model) isn't downloaded"
+        case .modelLanguageMismatch(let model, let language):
+            let name = Locale.current.localizedString(forLanguageCode: language) ?? language
+            return "Model \(model) is English-only and can't recognise \(name)"
         default: return "Speech recognition failed"
         }
     }
