@@ -139,24 +139,20 @@ struct PrompterContentView: View {
             theme.backgroundColor
 
             GeometryReader { geo in
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    movingText
-                        .frame(width: geo.size.width, alignment: .center)
-                        .offset(y: -viewModel.offset)
-                        .background(HeightReader(height: $contentHeight))
-                    Spacer(minLength: 0)
-                }
-                .clipped()
-                .onChange(of: viewModel.offset) { _, val in
-                    let limit = contentHeight - viewModel.prompterHeight * 0.25
-                    if contentHeight > 0, val >= limit {
-                        viewModel.offset = max(0, limit)
-                        viewModel.pause()
+                movingText
+                    .frame(width: geo.size.width)
+                    .background(HeightReader(height: $contentHeight))
+                    .offset(y: -viewModel.offset)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                    .clipped()
+                    .onChange(of: viewModel.offset) { _, val in
+                        let limit = contentHeight - viewModel.prompterHeight * 0.25
+                        if contentHeight > 0, val >= limit {
+                            viewModel.offset = max(0, limit)
+                            viewModel.pause()
+                        }
                     }
-                }
-                .onChange(of: viewModel.text) { _, _ in viewModel.offset = 0 }
-                .onChange(of: contentHeight) { _, val in viewModel.contentHeight = val }
+                    .onChange(of: contentHeight) { _, val in viewModel.contentHeight = val }
             }
 
             fadeOverlays
@@ -328,62 +324,24 @@ struct PrompterContentView: View {
     // MARK: Text Rendering
 
     private var movingText: some View {
-        VStack(spacing: viewModel.lineHeight) { textBlock }
-            .padding(.horizontal, 16).padding(.top, 32)
+        ScriptTextView(content: renderContent) { viewModel.layoutProvider = $0 }
+            .padding(.horizontal, 16)
+            .padding(.top, PrompterViewModel.scriptTopInset)
     }
 
-    private var textBlock: some View {
-        let raw = viewModel.text.isEmpty ? "Put some text in Settings..." : viewModel.text
-        let full = "\n" + raw + "\n\n[the end]"
-        let nsAttr = styledAttributedString(full,
-            readUpTo: viewModel.sttEnabled ? viewModel.sttReadUpToOffset : 0)
-
-        let attr: AttributedString
-        if let a = try? AttributedString(nsAttr, including: \.appKit) {
-            var m = a
-            m.font = .system(size: viewModel.fontSize, weight: .regular, design: viewModel.fontDesign)
-            attr = m
-        } else {
-            var f = AttributedString(full)
-            f.font = .system(size: viewModel.fontSize, weight: .regular, design: viewModel.fontDesign)
-            f.foregroundColor = theme.textColor
-            attr = f
-        }
-
-        return Text(attr)
-            .multilineTextAlignment(viewModel.textAlignment.swiftUIAlignment)
-            .lineSpacing(viewModel.lineHeight)
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    private func styledAttributedString(_ text: String, readUpTo: Int) -> NSMutableAttributedString {
-        let s = NSMutableAttributedString(string: text)
-        let full = NSRange(location: 0, length: text.utf16.count)
-        let font = NSFont.systemFont(ofSize: CGFloat(viewModel.fontSize))
-        let color = NSColor(theme.textColor)
-
-        s.addAttribute(.font, value: font, range: full)
-        s.addAttribute(.foregroundColor, value: color, range: full)
-
-        // Dim already-read text
-        if readUpTo > 0 {
-            let r = NSRange(location: 0, length: min(readUpTo, text.utf16.count))
-            s.addAttribute(.foregroundColor, value: color.withAlphaComponent(0.35), range: r)
-        }
-
-        // Italicise stage directions [like this]
-        if let regex = try? NSRegularExpression(pattern: "\\[[^\\]]+\\]") {
-            for m in regex.matches(in: text, range: full) {
-                s.addAttribute(.foregroundColor, value: color.withAlphaComponent(0.3), range: m.range)
-                let desc = font.fontDescriptor.withSymbolicTraits(.italic)
-                if let italic = NSFont(descriptor: desc, size: font.pointSize) {
-                    s.addAttribute(.font, value: italic, range: m.range)
-                }
-            }
-        }
-        return s
+    private var renderContent: ScriptRenderContent {
+        let tracking = viewModel.sttEnabled
+        return ScriptRenderContent(
+            script: viewModel.text,
+            fontSize: CGFloat(viewModel.fontSize),
+            fontDesign: viewModel.fontDesign,
+            lineSpacing: CGFloat(viewModel.lineHeight),
+            alignment: viewModel.textAlignment.nsAlignment,
+            textColor: NSColor(theme.textColor),
+            accentColor: NSColor(theme.accentColor),
+            readUpTo: tracking ? viewModel.sttReadUpToOffset : 0,
+            currentWord: tracking ? viewModel.sttCurrentWordRange : nil
+        )
     }
 }
 

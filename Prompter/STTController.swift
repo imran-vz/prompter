@@ -39,6 +39,11 @@ final class STTController: ObservableObject {
     @Published private(set) var lastTranscript = ""
     @Published private(set) var lastAlignment: AlignmentResult?
     @Published private(set) var vadState: VADState = .silence
+    /// Why the Pipeline last failed to start or broke, while it keeps retrying
+    /// (e.g. a Model that isn't downloaded yet). Cleared once listening.
+    @Published private(set) var lastIssue: STTError?
+    /// The fatal error behind `.failed`, so the UI can offer the right fix.
+    @Published private(set) var fatalIssue: STTError?
 
     var isRunning: Bool { runTask != nil }
 
@@ -57,12 +62,17 @@ final class STTController: ObservableObject {
     private var vad = VADDetector()
 
     private var runTask: Task<Void, Never>?
+    /// The previous supervisor, still tearing down after `stop()`. The next
+    /// `start()` waits for it so the old loop can't stop the shared Engine or
+    /// capture after the new session has started.
+    private var retiredTask: Task<Void, Never>?
     /// Bumped on every stop/engine-swap; stale supervisor loops see a mismatch
     /// and exit instead of fighting the new one for the capture service.
     private var generation = 0
 
     private var accumulatedTranscript = ""
     private var currentScript = ""
+    private var locale: Locale = .current
 
     // Alignment coalescing (all MainActor; the align itself runs on the actor)
     private var pendingAlignment: (text: String, isFinal: Bool)?
@@ -78,6 +88,12 @@ final class STTController: ObservableObject {
     }
 
     // MARK: - Public
+
+    /// Language used to spell out numbers when matching the Script.
+    func setLocale(_ newLocale: Locale) {
+        locale = newLocale
+        Task { await aligner.setLocale(newLocale) }
+    }
 
     func updateScript(_ script: String) {
         currentScript = script
@@ -98,15 +114,22 @@ final class STTController: ObservableObject {
         generation += 1
         let gen = generation
         status = .starting
+        lastIssue = nil
+        fatalIssue = nil
         accumulatedTranscript = ""
         vad.reset()
         vadState = .silence
-        runTask = Task { await self.supervise(generation: gen) }
+        let previous = retiredTask
+        runTask = Task {
+            await previous?.value
+            await self.supervise(generation: gen)
+        }
     }
 
     func stop() {
         generation += 1
         runTask?.cancel()
+        retiredTask = runTask
         runTask = nil
         capture.stop()
         status = .idle
@@ -142,6 +165,7 @@ final class STTController: ObservableObject {
                 }
                 try capture.start()
                 status = .listening
+                lastIssue = nil
                 backoff = 0.5
 
                 // Run both consumers; if either finishes, the chain is broken —
@@ -167,10 +191,16 @@ final class STTController: ObservableObject {
                 await engine.stop()
             } catch let error as STTError where error.isFatal {
                 await engine.stop()
-                if gen == generation { status = .failed(Self.describe(error)) }
+                if gen == generation {
+                    fatalIssue = error
+                    status = .failed(Self.describe(error))
+                }
                 return
             } catch {
                 await engine.stop()
+                if gen == generation {
+                    lastIssue = error as? STTError ?? .unknown(error.localizedDescription)
+                }
             }
 
             if gen == generation { capture.stop() }
@@ -183,11 +213,17 @@ final class STTController: ObservableObject {
         }
     }
 
-    private static func describe(_ error: STTError) -> String {
+    static func describe(_ error: STTError) -> String {
         switch error {
         case .noMicrophoneAccess: return "Microphone access denied"
         case .notAuthorized: return "Speech recognition not authorized"
         case .engineNotAvailable: return "Speech engine unavailable"
+        case .onDeviceRecognitionUnavailable(let language):
+            return "On-device recognition for \(language) isn't installed"
+        case .modelNotDownloaded(let model): return "Model \(model) isn't downloaded"
+        case .modelLanguageMismatch(let model, let language):
+            let name = Locale.current.localizedString(forLanguageCode: language) ?? language
+            return "Model \(model) is English-only and can't recognise \(name)"
         default: return "Speech recognition failed"
         }
     }
@@ -234,12 +270,17 @@ final class STTController: ObservableObject {
 
         // Words arriving from the recognizer outrank energy thresholds:
         // never let a miscalibrated VAD freeze the prompter mid-read.
-        let now = Date().timeIntervalSinceReferenceDate
-        let (newState, changed) = vad.noteSpeechEvidence(now: now)
-        if changed { applyVADTransition(to: newState) }
+        // Only Partials count: a Final usually lands just after the Turn
+        // ended, and treating it as speech would reopen the Turn and commit
+        // it a second time.
+        if !chunk.isFinal {
+            let now = Date().timeIntervalSinceReferenceDate
+            let (newState, changed) = vad.noteSpeechEvidence(now: now)
+            if changed { applyVADTransition(to: newState) }
+        }
 
         if chunk.isFinal {
-            accumulatedTranscript = merge(accumulated: accumulatedTranscript, final: text)
+            accumulatedTranscript = TranscriptMerger.merge(accumulated: accumulatedTranscript, final: text)
             scheduleAlignment(text: accumulatedTranscript, isFinal: true)
         } else {
             scheduleAlignment(text: text, isFinal: false)
@@ -270,29 +311,5 @@ final class STTController: ObservableObject {
     private func takePendingAlignment() -> (text: String, isFinal: Bool)? {
         defer { pendingAlignment = nil }
         return pendingAlignment
-    }
-
-    // MARK: - Transcript Merging
-
-    private func merge(accumulated: String, final: String) -> String {
-        let a = accumulated.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let f = final.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        if a.hasSuffix(f) { return accumulated }
-
-        let wa = a.split(whereSeparator: \.isWhitespace).map(String.init)
-        let wf = f.split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !wa.isEmpty, !wf.isEmpty else {
-            return accumulated.isEmpty ? final : accumulated
-        }
-
-        var overlap = 0
-        for n in 1...min(wa.count, wf.count) {
-            if Array(wa.suffix(n)) == Array(wf.prefix(n)) { overlap = n }
-        }
-        if overlap > 0 {
-            let kept = wa.dropLast(overlap).joined(separator: " ")
-            return kept.isEmpty ? final : kept + " " + final
-        }
-        return accumulated.isEmpty ? final : accumulated + " " + final
     }
 }

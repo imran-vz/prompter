@@ -5,12 +5,13 @@
 //  Shared type definitions used across the app.
 //
 
+import AppKit
 import SwiftUI
 
 // MARK: - Font.Design Persistence
 
 extension Font.Design: @retroactive RawRepresentable {
-    public init?(rawValue: String) {
+    nonisolated public init?(rawValue: String) {
         switch rawValue {
         case "default": self = .default
         case "serif": self = .serif
@@ -20,7 +21,7 @@ extension Font.Design: @retroactive RawRepresentable {
         }
     }
 
-    public var rawValue: String {
+    nonisolated public var rawValue: String {
         switch self {
         case .default: return "default"
         case .serif: return "serif"
@@ -142,11 +143,11 @@ enum PrompterTextAlignment: String, CaseIterable {
         }
     }
 
-    var swiftUIAlignment: TextAlignment {
+    var nsAlignment: NSTextAlignment {
         switch self {
-        case .leading: return .leading
+        case .leading: return .left
         case .center: return .center
-        case .trailing: return .trailing
+        case .trailing: return .right
         }
     }
 }

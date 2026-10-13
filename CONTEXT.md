@@ -24,6 +24,10 @@ In code: "Hover Controls" in the UI.
 The fraction of the Prompter's height at which the current word should sit.
 In code: `readingLineOffset`.
 
+**Current word**:
+The word in the Script the speaker was last heard saying, highlighted in the Prompter.
+In code: `currentWordRange`.
+
 **Read-up-to point**:
 The spot in the Script up to which the speaker has been heard; text before it is dimmed.
 In code: `readUpToOffset`.
