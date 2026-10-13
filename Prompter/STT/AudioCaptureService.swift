@@ -44,6 +44,11 @@ nonisolated final class AudioCaptureService: @unchecked Sendable {
     private var continuations: [UUID: AsyncStream<AudioCaptureEvent>.Continuation] = [:]
     private var isCapturing = false
     private var configChangeObserver: NSObjectProtocol?
+    /// Whether the input node has been brought up (controlQueue only). Reading
+    /// `engine.inputNode` synchronously opens the audio input, which can stall
+    /// for minutes on a machine without one, so teardown skips it until
+    /// capture has actually started.
+    private var inputPrepared = false
 
     // MARK: - Subscriptions
 
@@ -121,12 +126,15 @@ nonisolated final class AudioCaptureService: @unchecked Sendable {
     // MARK: - Engine plumbing (controlQueue only)
 
     private func teardownEngineLocked() {
+        guard inputPrepared else { return }
+        inputPrepared = false
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         engine.reset()
     }
 
     private func installTapAndStartLocked() throws {
+        inputPrepared = true
         let inputNode = engine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
